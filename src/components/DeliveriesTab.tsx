@@ -267,7 +267,7 @@ export default function DeliveriesTab({ currentUserProfile, deliveries, branches
                   <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline">
                     <span className="font-semibold text-slate-400">Value of consignment:</span>
                     <span className="font-mono text-base font-bold text-slate-900">
-                      ${order.items.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ₹{order.items.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>

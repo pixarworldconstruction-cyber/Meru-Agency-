@@ -296,7 +296,7 @@ export default function HospitalClientView({ currentUserProfile, products, branc
 
                     <div className="mt-4 pt-3 border-t border-slate-55 bg-slate-50/50 -mx-4 -mb-4 p-4 rounded-b-xl flex items-center justify-between">
                       <div>
-                        <div className="font-mono font-bold text-slate-900">${product.price.toFixed(2)}</div>
+                        <div className="font-mono font-bold text-slate-900">₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                         <div className="text-[10px] text-slate-405">Qty: {product.unit}</div>
                       </div>
 
@@ -355,7 +355,7 @@ export default function HospitalClientView({ currentUserProfile, products, branc
                 <div key={item.product.id} className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex justify-between gap-2.5">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold text-slate-700 truncate">{item.product.name}</p>
-                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">${item.product.price.toFixed(2)} each</p>
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">₹{item.product.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} each</p>
                   </div>
 
                   <div className="flex flex-col items-end justify-between shrink-0">
@@ -396,7 +396,7 @@ export default function HospitalClientView({ currentUserProfile, products, branc
           {cart.length > 0 && (
             <div className="border-t border-slate-100 pt-3 flex justify-between items-baseline">
               <span className="text-xs text-slate-500">Subtotal value:</span>
-              <span className="font-mono text-base font-extrabold text-slate-900">${getTotalPrice().toFixed(2)}</span>
+              <span className="font-mono text-base font-extrabold text-slate-900">₹{getTotalPrice().toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
             </div>
           )}
 

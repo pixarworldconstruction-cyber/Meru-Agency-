@@ -286,9 +286,9 @@ export default function ProductsTab({ currentUserProfile, products, branches }: 
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Standard Price (USD)</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Standard Price (INR)</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-2 text-slate-400 text-sm">$</span>
+                  <span className="absolute left-3 top-2 text-slate-400 text-sm">₹</span>
                   <input
                     type="number"
                     step="0.01"
@@ -495,7 +495,7 @@ export default function ProductsTab({ currentUserProfile, products, branches }: 
                   </td>
 
                   <td className="px-6 py-4 text-xs font-semibold text-slate-700">
-                    <div className="font-mono text-slate-800">${product.price.toFixed(2)}</div>
+                    <div className="font-mono text-slate-800">₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                     <div className="text-[10px] text-slate-400 font-medium">per {product.unit}</div>
                   </td>
 

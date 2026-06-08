@@ -2,21 +2,11 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import firebaseConfig from '../firebase-applet-config.json';
 
-// User's provided Firebase configuration with dynamic override support for Vercel/production envs
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAj2Tu_FYnC0y9e4A2dnqnaQ1TP2K2O8-Q",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "meru-4fe16.firebaseapp.com",
-  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://meru-4fe16-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "meru-4fe16",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "meru-4fe16.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "171070159907",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:171070159907:web:d7ee8816bf74eb46404596"
-};
-
-// Initialize Firebase
+// Initialize Firebase using the provisioned applet configuration
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 export const auth = getAuth(app);
 
 // Operational types for structured Firestore error context as required by guidelines

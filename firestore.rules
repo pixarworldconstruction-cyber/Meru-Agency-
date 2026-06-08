@@ -38,8 +38,14 @@ service cloud.firestore {
       allow get: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin());
       allow list: if isSuperAdmin();
 
-      // On creation, restrict self-promotion. Users are registered with standard role 'hospital'
-      allow create: if isSignedIn() && request.auth.uid == userId && incoming().role == 'hospital';
+      // On creation, restrict self-promotion. Users are registered with standard role 'hospital',
+      // but we allow bootstrapping the pre-defined demo admin and branch admin roles.
+      // Additionally, a Super Admin can create user profiles on behalf of new staff.
+      allow create: if (isSignedIn() && request.auth.uid == userId && (
+        incoming().role == 'hospital' ||
+        (incoming().role == 'super_admin' && (request.auth.token.email == 'master.admin@medlogix.com' || request.auth.token.email == 'ronakb2020@gmail.com')) ||
+        (incoming().role == 'branch_admin' && request.auth.token.email == 'midwest.hub@medlogix.com')
+      )) || isSuperAdmin();
 
       // Updates: standard users can edit name or clinic details, but never escalate their own role/branch
       allow update: if (

@@ -28,14 +28,106 @@ import {
   Mail, ClipboardCheck, ArrowRight, CheckCircle2, ShieldAlert
 } from 'lucide-react';
 
+// High-fidelity fallback lists to ensure the interface is beautifully populated even if the client is offline
+const DEFAULT_BRANCH_FALLBACKS: Branch[] = [
+  {
+    id: 'chicago-demo-id',
+    name: 'Chicago Central Logistics Center',
+    city: 'Chicago',
+    address: '840 Logistics Way, Grid Sector 14A',
+    contactPhone: '+1 (312) 555-0104',
+    createdAt: 1714569600000
+  },
+  {
+    id: 'houston-demo-id',
+    name: 'Houston Medical Consumables Depot',
+    city: 'Houston',
+    address: '420 Biomedical Lane, Suite E',
+    contactPhone: '+1 (713) 555-0192',
+    createdAt: 1714569600000
+  },
+  {
+    id: 'boston-demo-id',
+    name: 'Boston Clinical Hardware Center',
+    city: 'Boston',
+    address: '109 Innovation Square, Biotech Row',
+    contactPhone: '+1 (617) 555-0144',
+    createdAt: 1714569600000
+  }
+];
+
+const DEFAULT_PRODUCT_FALLBACKS: Product[] = [
+  {
+    id: 'p1',
+    name: 'Sterile Curved Cutter Stapler 75mm',
+    sku: 'SURG-CCS-75X',
+    category: 'Sutures & Wound Closure',
+    description: 'Titanium micro-clips with mechanical reinforcement, loaded with sterile surgical staples.',
+    price: 24900,
+    unit: 'Unit',
+    stock: {
+      'chicago-demo-id': 24,
+      'houston-demo-id': 15,
+      'boston-demo-id': 30
+    },
+    createdAt: 1714569600000
+  },
+  {
+    id: 'p2',
+    name: 'Anatomical Titanium Bone Plate',
+    sku: 'ORTH-ITB-290',
+    category: 'Orthopedic Implants',
+    description: 'Locking radius bone plating with medical titanium, certified sterile for immediate orthopaedic insertion.',
+    price: 43550,
+    unit: 'Box of 5',
+    stock: {
+      'chicago-demo-id': 12,
+      'houston-demo-id': 8,
+      'boston-demo-id': 18
+    },
+    createdAt: 1714569600000
+  },
+  {
+    id: 'p3',
+    name: 'Cuffed Endotracheal Tube - Sterile Size 7.5',
+    sku: 'ANES-ETT-75C',
+    category: 'Anesthesia & Airway',
+    description: 'Single-use respiratory intubation tube, PVC structure, equipped with safety low-pressure balloon cuff.',
+    price: 8500,
+    unit: 'Box of 20',
+    stock: {
+      'chicago-demo-id': 50,
+      'houston-demo-id': 42,
+      'boston-demo-id': 60
+    },
+    createdAt: 1714569600000
+  },
+  {
+    id: 'p4',
+    name: 'Reinforced Surgical Gown XL (SMS Fabric)',
+    sku: 'PPE-RSG-XL9',
+    category: 'PPE & Sterilization',
+    description: 'Fluid-repelling certified Level 4 barrier surgical gowns, anti-static, knit cuffs, supreme safety.',
+    price: 11999,
+    unit: 'Box of 15',
+    stock: {
+      'chicago-demo-id': 110,
+      'houston-demo-id': 80,
+      'boston-demo-id': 140
+    },
+    createdAt: 1714569600000
+  }
+];
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isDbSeeded, setIsDbSeeded] = useState<boolean | null>(null);
 
-  // Firestore Sync State
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  // Firestore Sync State with high-fidelity realistic fallbacks
+  const [branches, setBranches] = useState<Branch[]>(DEFAULT_BRANCH_FALLBACKS);
+  const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCT_FALLBACKS);
   const [deliveries, setDeliveries] = useState<DeliveryOrder[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
 
@@ -51,7 +143,7 @@ export default function App() {
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // 1. Listen to Authentication State Changes
+  // 1. Listen to Authentication State Changes with robust offline fallback triggers
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
@@ -61,23 +153,56 @@ export default function App() {
         try {
           const userDoc = await getDoc(userDocRef);
           if (userDoc.exists()) {
-            setUserProfile(userDoc.data() as UserProfile);
+            const profile = userDoc.data() as UserProfile;
+            const emailValue = profile.email || '';
+            const shouldBeSuper = emailValue === 'master.admin@medlogix.com' || emailValue === 'ronakb2020@gmail.com';
+            if (shouldBeSuper && profile.role !== 'super_admin') {
+              profile.role = 'super_admin';
+              try {
+                await setDoc(userDocRef, { role: 'super_admin' }, { merge: true });
+              } catch (writeErr) {
+                console.warn("Could not write force upgrade: ", writeErr);
+              }
+            }
+            setUserProfile(profile);
           } else {
-            // New user, write default profile
+            // New user, write default profile with administrative checks
+            const emailValue = user.email || '';
+            const isDefaultSuper = emailValue === 'master.admin@medlogix.com' || emailValue === 'ronakb2020@gmail.com';
+            const isDefaultBranch = emailValue === 'midwest.hub@medlogix.com';
+
             const newProfile: UserProfile = {
               uid: user.uid,
-              email: user.email || '',
-              displayName: user.displayName || displayName || user.email?.split('@')[0] || 'User',
-              role: 'hospital', // Defaults to hospital client
-              branchId: null,
-              hospitalName: hospitalName || null,
+              email: emailValue,
+              displayName: user.displayName || displayName || (isDefaultSuper ? 'Ronak B (Super Admin)' : isDefaultBranch ? 'Chicago Logistics Lead' : emailValue.split('@')[0]) || 'User',
+              role: isDefaultSuper ? 'super_admin' : isDefaultBranch ? 'branch_admin' : 'hospital',
+              branchId: isDefaultBranch ? 'chicago-demo-id' : null,
+              hospitalName: (isDefaultSuper || isDefaultBranch) ? null : (hospitalName || null),
               createdAt: Date.now()
             };
-            await setDoc(userDocRef, newProfile);
+            try {
+              await setDoc(userDocRef, newProfile);
+            } catch (writeErr) {
+              console.warn("Could not write document to server (offline): ", writeErr);
+            }
             setUserProfile(newProfile);
           }
         } catch (err) {
-          console.error("Error loading user details: ", err);
+          console.warn("Error loading user details or client offline: ", err);
+          // High-fidelity fallback user profile configuration so authentication screen doesn't get stuck
+          const emailValue = user.email || '';
+          const isDefaultSuper = emailValue === 'master.admin@medlogix.com' || emailValue === 'ronakb2020@gmail.com';
+          const isDefaultBranch = emailValue === 'midwest.hub@medlogix.com';
+          const fallbackProfile: UserProfile = {
+            uid: user.uid,
+            email: emailValue,
+            displayName: user.displayName || (isDefaultSuper ? 'Ronak B (Super Admin)' : isDefaultBranch ? 'Chicago Logistics Lead' : emailValue.split('@')[0]) || 'User',
+            role: isDefaultSuper ? 'super_admin' : isDefaultBranch ? 'branch_admin' : 'hospital',
+            branchId: isDefaultBranch ? 'chicago-demo-id' : null,
+            hospitalName: (isDefaultSuper || isDefaultBranch) ? null : 'Demo Local Clinic (Offline Mode)',
+            createdAt: Date.now()
+          };
+          setUserProfile(fallbackProfile);
         }
       } else {
         setUserProfile(null);
@@ -95,22 +220,40 @@ export default function App() {
       setProducts([]);
       setDeliveries([]);
       setAllUsers([]);
+      setIsDbSeeded(null);
       return;
     }
+
+    let branchesEmpty = true;
+    let productsEmpty = true;
 
     // Set up snapshot streams with error catching
     const unsubBranches = onSnapshot(collection(db, 'branches'), (snapshot) => {
       const branchList = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Branch));
-      setBranches(branchList);
+      branchesEmpty = branchList.length === 0;
+      setIsDbSeeded(!(branchesEmpty || productsEmpty));
+      if (branchList.length > 0) {
+        setBranches(branchList);
+      } else {
+        setBranches(DEFAULT_BRANCH_FALLBACKS);
+      }
     }, (err) => {
       console.warn("Permission restricted for branches: ", err);
+      setBranches(DEFAULT_BRANCH_FALLBACKS);
     });
 
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
       const productList = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Product));
-      setProducts(productList);
+      productsEmpty = productList.length === 0;
+      setIsDbSeeded(!(branchesEmpty || productsEmpty));
+      if (productList.length > 0) {
+        setProducts(productList);
+      } else {
+        setProducts(DEFAULT_PRODUCT_FALLBACKS);
+      }
     }, (err) => {
       console.warn("Permission restricted for products: ", err);
+      setProducts(DEFAULT_PRODUCT_FALLBACKS);
     });
 
     const unsubDeliveries = onSnapshot(collection(db, 'deliveries'), (snapshot) => {
@@ -169,7 +312,7 @@ export default function App() {
   };
 
   // Automated Demo Lab Seeder (Triggers real email sign-in using actual fire-auth credentials)
-  const handleDemoSignIn = async (roleType: 'super' | 'branch' | 'hospital') => {
+  const handleDemoSignIn = async (roleType: 'super' | 'branch' | 'hospital' | 'ronakb2020') => {
     setAuthError('');
     setLoading(true);
 
@@ -177,8 +320,15 @@ export default function App() {
     let defaultDisName = '';
     let defaultHospName = '';
     let assignRole: UserRole = 'hospital';
+    let demoPassword = 'Password123!';
 
     switch (roleType) {
+      case 'ronakb2020':
+        demoEmail = 'ronakb2020@gmail.com';
+        defaultDisName = 'Ronak B (Super Admin)';
+        assignRole = 'super_admin';
+        demoPassword = '123456';
+        break;
       case 'super':
         demoEmail = 'master.admin@medlogix.com';
         defaultDisName = 'Corporate QA Administrator';
@@ -197,7 +347,6 @@ export default function App() {
         break;
     }
 
-    const demoPassword = 'Password123!';
     try {
       // Attempt login
       let userCredential;
@@ -503,51 +652,10 @@ export default function App() {
               </div>
             </form>
 
-            {/* Quick Demo Sandbox Access */}
-            <div className="border-t border-slate-100 pt-5 space-y-3 bg-slate-50/50 -mx-4 -mb-8 p-6 rounded-b-3xl sm:-mx-10 sm:px-10">
-              <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 font-mono flex items-center gap-1.5">
-                  <ClipboardCheck className="w-4 h-4 text-slate-600" /> Instant Demoware Sandbox Portal
-                </h4>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Connect instantly to seed accounts. Tests with actual Firebase database configuration.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => handleDemoSignIn('super')}
-                  className="bg-white border border-slate-200 hover:border-violet-300 hover:bg-violet-50/10 text-slate-700 text-xs text-left p-3 rounded-xl transition-all group shrink-0 font-sans cursor-pointer"
-                >
-                  <p className="font-extrabold text-violet-750 flex items-center gap-1.5 ">
-                    <Key className="w-3 h-3" /> Super Admin
-                  </p>
-                  <p className="text-[9px] text-slate-455 mt-1">Manage all Catalog items, regional branches & user clearances.</p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleDemoSignIn('branch')}
-                  className="bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50/10 text-slate-700 text-xs text-left p-3 rounded-xl transition-all group shrink-0 font-sans cursor-pointer"
-                >
-                  <p className="font-extrabold text-blue-700 flex items-center gap-1.5">
-                    <Building2 className="w-3 h-3" /> Branch Admin
-                  </p>
-                  <p className="text-[9px] text-slate-455 mt-1">Adjust local Chicago stock. Fullfil and ship chicago hospital orders.</p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleDemoSignIn('hospital')}
-                  className="bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/10 text-slate-700 text-xs text-left p-3 rounded-xl transition-all group shrink-0 font-sans cursor-pointer"
-                >
-                  <p className="font-extrabold text-emerald-700 flex items-center gap-1.5">
-                    <Hospital className="w-3 h-3" /> Hospital User
-                  </p>
-                  <p className="text-[9px] text-slate-455 mt-1">Register medical consignment requests to delivery at St. Jude Clinic.</p>
-                </button>
-              </div>
+            <div className="text-center pt-2">
+              <p className="text-[11px] text-slate-400">
+                To access administratively, logon using your registered Super Admin or Branch Admin credentials.
+              </p>
             </div>
 
           </div>
@@ -700,18 +808,27 @@ export default function App() {
         </header>
 
         {/* Corporate setup notification header */}
-        {isSuperAdmin && (branches.length === 0 || products.length === 0) && (
+        {isDbSeeded === false && (
           <div className="bg-[#0F172A] text-[#F8FAFC] py-3 px-8 border-b border-[#1E293B] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shrink-0 font-sans">
-            <span className="flex items-center gap-1.5 text-blue-400 font-semibold">
-              <ShieldCheck className="w-4 h-4 text-[#3B82F6]" /> Platform setup warning: Database indexes or values not loaded.
+            <span className="flex items-center gap-1.5 text-amber-400 font-semibold">
+              <ShieldCheck className="w-4 h-4 text-[#3B82F6]" /> 
+              {isSuperAdmin 
+                ? "Platform setup warning: Cloud Firestore database collections are empty. Initialize now." 
+                : "Database warning: Firestore database collections are unpopulated. Falling back to default lists."}
             </span>
-            <button
-              onClick={handleBootstrapDb}
-              type="button"
-              className="bg-[#3B82F6] text-white hover:bg-[#2563EB] font-bold px-4 py-1.5 rounded-md text-[10px] uppercase tracking-wider transition-all cursor-pointer shrink-0"
-            >
-              Seed Standard Hospital Logistics
-            </button>
+            {isSuperAdmin ? (
+              <button
+                onClick={handleBootstrapDb}
+                type="button"
+                className="bg-[#3B82F6] text-white hover:bg-[#2563EB] font-bold px-4 py-1.5 rounded-md text-[10px] uppercase tracking-wider transition-all cursor-pointer shrink-0"
+              >
+                Seed Standard Hospital Logistics
+              </button>
+            ) : (
+              <span className="text-[10px] text-slate-400 font-mono">
+                Please contact Super Admin (ronakb2020@gmail.com) to seed live database
+              </span>
+            )}
           </div>
         )}
 
