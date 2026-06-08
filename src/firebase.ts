@@ -2,15 +2,15 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-// User's provided Firebase configuration
+// User's provided Firebase configuration with dynamic override support for Vercel/production envs
 const firebaseConfig = {
-  apiKey: "AIzaSyAj2Tu_FYnC0y9e4A2dnqnaQ1TP2K2O8-Q",
-  authDomain: "meru-4fe16.firebaseapp.com",
-  databaseURL: "https://meru-4fe16-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "meru-4fe16",
-  storageBucket: "meru-4fe16.firebasestorage.app",
-  messagingSenderId: "171070159907",
-  appId: "1:171070159907:web:d7ee8816bf74eb46404596"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAj2Tu_FYnC0y9e4A2dnqnaQ1TP2K2O8-Q",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "meru-4fe16.firebaseapp.com",
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://meru-4fe16-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "meru-4fe16",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "meru-4fe16.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "171070159907",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:171070159907:web:d7ee8816bf74eb46404596"
 };
 
 // Initialize Firebase
