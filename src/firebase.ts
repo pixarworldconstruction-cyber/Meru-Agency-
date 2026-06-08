@@ -6,7 +6,10 @@ import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase using the provisioned applet configuration
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
+const dbId = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)' && firebaseConfig.firestoreDatabaseId !== '') 
+  ? firebaseConfig.firestoreDatabaseId 
+  : undefined;
+export const db = getFirestore(app, dbId); /* CRITICAL: The app will break without this line */
 export const auth = getAuth(app);
 
 // Operational types for structured Firestore error context as required by guidelines

@@ -7,10 +7,11 @@ import { Building2, Search, Plus, MapPin, Phone, Trash2, Edit2, ShieldAlert } fr
 interface BranchesTabProps {
   currentUserProfile: UserProfile | null;
   branches: Branch[];
-  setBranches: React.Dispatch<React.SetStateAction<Branch[]>>;
+  setBranches?: React.Dispatch<React.SetStateAction<Branch[]>>;
+  onMarkDeleted?: (branchId: string) => void;
 }
 
-export default function BranchesTab({ currentUserProfile, branches, setBranches }: BranchesTabProps) {
+export default function BranchesTab({ currentUserProfile, branches, setBranches, onMarkDeleted }: BranchesTabProps) {
   const isSuperAdmin = currentUserProfile?.role === 'super_admin';
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -72,8 +73,14 @@ export default function BranchesTab({ currentUserProfile, branches, setBranches 
     const path = `branches/${branchId}`;
     try {
       await deleteDoc(doc(db, 'branches', branchId));
+      if (onMarkDeleted) {
+        onMarkDeleted(branchId);
+      }
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, path);
+      if (onMarkDeleted) {
+        onMarkDeleted(branchId);
+      }
     }
   };
 

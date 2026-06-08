@@ -21,11 +21,13 @@ import ProductsTab from './components/ProductsTab';
 import DeliveriesTab from './components/DeliveriesTab';
 import HospitalClientView from './components/HospitalClientView';
 import UserManagementTab from './components/UserManagementTab';
+import AnalyticsTab from './components/AnalyticsTab';
 
 import { 
   Truck, Building2, ShoppingBag, ShieldCheck, 
   Users, LogOut, Loader2, Hospital, Key, Lock, 
-  Mail, ClipboardCheck, ArrowRight, CheckCircle2, ShieldAlert
+  Mail, ClipboardCheck, ArrowRight, CheckCircle2, ShieldAlert,
+  BarChart2
 } from 'lucide-react';
 
 // High-fidelity fallback lists to ensure the interface is beautifully populated even if the client is offline
@@ -130,9 +132,11 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCT_FALLBACKS);
   const [deliveries, setDeliveries] = useState<DeliveryOrder[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [deletedProductIds, setDeletedProductIds] = useState<string[]>([]);
+  const [deletedBranchIds, setDeletedBranchIds] = useState<string[]>([]);
 
   // UI Navigation Tabs
-  const [activeTab, setActiveTab] = useState<'products' | 'branches' | 'deliveries' | 'coordination'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'branches' | 'deliveries' | 'coordination' | 'analytics'>('products');
 
   // Manual Credentials Inputs
   const [email, setEmail] = useState('');
@@ -143,29 +147,23 @@ export default function App() {
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // 1. Listen to Authentication State Changes with robust offline fallback triggers
+  // 1. Listen to Authentication State Changes with robust offline fallback triggers and real-time profile loading
   useEffect(() => {
+    let unsubProfileSnapshot: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (unsubProfileSnapshot) {
+        unsubProfileSnapshot();
+        unsubProfileSnapshot = null;
+      }
+
       setCurrentUser(user);
       if (user) {
         // Fetch or create user profile document
         const userDocRef = doc(db, 'users', user.uid);
         try {
           const userDoc = await getDoc(userDocRef);
-          if (userDoc.exists()) {
-            const profile = userDoc.data() as UserProfile;
-            const emailValue = profile.email || '';
-            const shouldBeSuper = emailValue === 'master.admin@medlogix.com' || emailValue === 'ronakb2020@gmail.com';
-            if (shouldBeSuper && profile.role !== 'super_admin') {
-              profile.role = 'super_admin';
-              try {
-                await setDoc(userDocRef, { role: 'super_admin' }, { merge: true });
-              } catch (writeErr) {
-                console.warn("Could not write force upgrade: ", writeErr);
-              }
-            }
-            setUserProfile(profile);
-          } else {
+          if (!userDoc.exists()) {
             // New user, write default profile with administrative checks
             const emailValue = user.email || '';
             const isDefaultSuper = emailValue === 'master.admin@medlogix.com' || emailValue === 'ronakb2020@gmail.com';
@@ -185,32 +183,50 @@ export default function App() {
             } catch (writeErr) {
               console.warn("Could not write document to server (offline): ", writeErr);
             }
-            setUserProfile(newProfile);
           }
         } catch (err) {
-          console.warn("Error loading user details or client offline: ", err);
-          // High-fidelity fallback user profile configuration so authentication screen doesn't get stuck
-          const emailValue = user.email || '';
-          const isDefaultSuper = emailValue === 'master.admin@medlogix.com' || emailValue === 'ronakb2020@gmail.com';
-          const isDefaultBranch = emailValue === 'midwest.hub@medlogix.com';
-          const fallbackProfile: UserProfile = {
-            uid: user.uid,
-            email: emailValue,
-            displayName: user.displayName || (isDefaultSuper ? 'Ronak B (Super Admin)' : isDefaultBranch ? 'Chicago Logistics Lead' : emailValue.split('@')[0]) || 'User',
-            role: isDefaultSuper ? 'super_admin' : isDefaultBranch ? 'branch_admin' : 'hospital',
-            branchId: isDefaultBranch ? 'chicago-demo-id' : null,
-            hospitalName: (isDefaultSuper || isDefaultBranch) ? null : 'Demo Local Clinic (Offline Mode)',
-            createdAt: Date.now()
-          };
-          setUserProfile(fallbackProfile);
+          console.warn("Error checking user existence: ", err);
         }
+
+        // Setup real-time snapshot listener for this user
+        unsubProfileSnapshot = onSnapshot(userDocRef, (snapshot) => {
+          if (snapshot.exists()) {
+            const profile = snapshot.data() as UserProfile;
+            const emailValue = profile.email || '';
+            const shouldBeSuper = emailValue === 'master.admin@medlogix.com' || emailValue === 'ronakb2020@gmail.com';
+            if (shouldBeSuper && profile.role !== 'super_admin') {
+              profile.role = 'super_admin';
+            }
+            setUserProfile(profile);
+          } else {
+            // Document deleted or missing from firestore
+            const emailValue = user.email || '';
+            const isDefaultSuper = emailValue === 'master.admin@medlogix.com' || emailValue === 'ronakb2020@gmail.com';
+            setUserProfile({
+              uid: user.uid,
+              email: emailValue,
+              displayName: user.displayName || displayName || 'User',
+              role: isDefaultSuper ? 'super_admin' : 'hospital',
+              branchId: null,
+              createdAt: Date.now()
+            });
+          }
+          setLoading(false);
+        }, (err) => {
+          console.warn("Profile snapshot error: ", err);
+          setLoading(false);
+        });
+
       } else {
         setUserProfile(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (unsubProfileSnapshot) unsubProfileSnapshot();
+    };
   }, [displayName, hospitalName]);
 
   // 2. Real-time Firestore Listeners (only when authenticated)
@@ -669,8 +685,12 @@ export default function App() {
   const isBranchAdmin = userProfile.role === 'branch_admin';
   const isHospital = userProfile.role === 'hospital';
 
+  // Dynamic filtered lists to exclude locally deleted/decommissioned items
+  const activeProducts = products.filter(p => !deletedProductIds.includes(p.id));
+  const activeBranches = branches.filter(b => !deletedBranchIds.includes(b.id));
+
   // Find the operating city or division dynamically
-  const userBranch = branches.find(b => b.id === userProfile.branchId);
+  const userBranch = activeBranches.find(b => b.id === userProfile.branchId);
   const locationLabel = isHospital 
     ? (userProfile.hospitalName || 'Clinical Client') 
     : isBranchAdmin 
@@ -743,6 +763,15 @@ export default function App() {
                     <span>Staff Directory</span>
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('analytics')}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === 'analytics' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
+                >
+                  <BarChart2 className="w-4 h-4 shrink-0" />
+                  <span>Business Analytics</span>
+                </button>
               </>
             )}
           </nav>
@@ -786,12 +815,16 @@ export default function App() {
                     ? 'Hospital Consignment Logs'
                     : activeTab === 'branches'
                       ? 'Physical Branch Network'
-                      : 'Operational Staff Directory'}
+                      : activeTab === 'analytics'
+                        ? 'Operational Intelligence Dashboard'
+                        : 'Operational Staff Directory'}
             </h1>
             <p className="text-xs text-slate-500 mt-1 hidden sm:block">
               {isHospital 
                 ? 'Review product catalogue supplies and request rapid consignment logistics.' 
-                : 'Configure stocks, track deliveries, and manage branches.'}
+                : activeTab === 'analytics'
+                  ? 'Check overall and regional delivery sales, partner discounts, and supply stats.'
+                  : 'Configure stocks, track deliveries, and manage branches.'}
             </p>
           </div>
 
@@ -837,24 +870,26 @@ export default function App() {
           {isHospital ? (
             <HospitalClientView 
               currentUserProfile={userProfile}
-              products={products}
-              branches={branches}
+              products={activeProducts}
+              branches={activeBranches}
             />
           ) : (
             <>
               {activeTab === 'products' && (
                 <ProductsTab 
                   currentUserProfile={userProfile}
-                  products={products}
-                  branches={branches}
+                  products={activeProducts}
+                  branches={activeBranches}
+                  onMarkDeleted={(id) => setDeletedProductIds(prev => [...prev, id])}
                 />
               )}
 
               {activeTab === 'branches' && (
                 <BranchesTab 
                   currentUserProfile={userProfile}
-                  branches={branches}
+                  branches={activeBranches}
                   setBranches={setBranches}
+                  onMarkDeleted={(id) => setDeletedBranchIds(prev => [...prev, id])}
                 />
               )}
 
@@ -862,8 +897,8 @@ export default function App() {
                 <DeliveriesTab 
                   currentUserProfile={userProfile}
                   deliveries={deliveries}
-                  branches={branches}
-                  products={products}
+                  branches={activeBranches}
+                  products={activeProducts}
                 />
               )}
 
@@ -871,7 +906,16 @@ export default function App() {
                 <UserManagementTab 
                   currentUserProfile={userProfile}
                   usersList={allUsers}
-                  branches={branches}
+                  branches={activeBranches}
+                />
+              )}
+
+              {activeTab === 'analytics' && (
+                <AnalyticsTab 
+                  currentUserProfile={userProfile}
+                  deliveries={deliveries}
+                  branches={activeBranches}
+                  products={activeProducts}
                 />
               )}
             </>

@@ -1,10 +1,11 @@
 {
-  "projectId": "sublime-hub-l6vd8",
-  "appId": "1:429061664903:web:3585a1d80d91d51a664822",
-  "apiKey": "AIzaSyDRfx1o0IyxWmxQdW6NLcJp49gH7IpWutE",
-  "authDomain": "sublime-hub-l6vd8.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-a99119fa-0b22-4cf5-96d4-6bf950d11156",
-  "storageBucket": "sublime-hub-l6vd8.firebasestorage.app",
-  "messagingSenderId": "429061664903",
+  "projectId": "meru-4fe16",
+  "appId": "1:171070159907:web:d7ee8816bf74eb46404596",
+  "apiKey": "AIzaSyAj2Tu_FYnC0y9e4A2dnqnaQ1TP2K2O8-Q",
+  "authDomain": "meru-4fe16.firebaseapp.com",
+  "databaseURL": "https://meru-4fe16-default-rtdb.asia-southeast1.firebasedatabase.app",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "meru-4fe16.firebasestorage.app",
+  "messagingSenderId": "171070159907",
   "measurementId": ""
 }

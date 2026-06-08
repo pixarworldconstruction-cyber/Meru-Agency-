@@ -8,6 +8,7 @@ interface ProductsTabProps {
   currentUserProfile: UserProfile | null;
   products: Product[];
   branches: Branch[];
+  onMarkDeleted?: (productId: string) => void;
 }
 
 const CATEGORIES = [
@@ -20,7 +21,7 @@ const CATEGORIES = [
   'Disposable Consumables'
 ];
 
-export default function ProductsTab({ currentUserProfile, products, branches }: ProductsTabProps) {
+export default function ProductsTab({ currentUserProfile, products, branches, onMarkDeleted }: ProductsTabProps) {
   const isSuperAdmin = currentUserProfile?.role === 'super_admin';
   const isBranchAdmin = currentUserProfile?.role === 'branch_admin';
   const userBranchId = currentUserProfile?.branchId;
@@ -42,6 +43,16 @@ export default function ProductsTab({ currentUserProfile, products, branches }: 
   const [imageUrl, setImageUrl] = useState('');
   // Object holding branchId -> stock quantity
   const [branchStocks, setBranchStocks] = useState<{ [branchId: string]: number }>({});
+  
+  // Choose between restock ('add') and reset ('set') mode for stock management
+  const [stockModifyMode, setStockModifyMode] = useState<'add' | 'set'>('add');
+
+  // Quick Inward States for Branch Members / Admins
+  const [showQuickInward, setShowQuickInward] = useState(false);
+  const [selectedInwardProductId, setSelectedInwardProductId] = useState('');
+  const [inwardQty, setInwardQty] = useState(1);
+  const [inwardSubmitting, setInwardSubmitting] = useState(false);
+  const [inwardSuccessMessage, setInwardSuccessMessage] = useState('');
 
   // Trigger form opening for adding
   const handleOpenAdd = () => {
@@ -53,6 +64,7 @@ export default function ProductsTab({ currentUserProfile, products, branches }: 
     setPrice(0);
     setUnit('Box');
     setImageUrl('');
+    setShowQuickInward(false);
     
     // Initialize stocks
     const initialStocks: { [branchId: string]: number } = {};
@@ -73,6 +85,7 @@ export default function ProductsTab({ currentUserProfile, products, branches }: 
     setPrice(product.price);
     setUnit(product.unit);
     setImageUrl(product.imageUrl || '');
+    setShowQuickInward(false);
     
     // Merge existing branch stocks with any newly added branches that have 0
     const mergedStocks: { [branchId: string]: number } = {};
@@ -90,15 +103,21 @@ export default function ProductsTab({ currentUserProfile, products, branches }: 
   const handleSaveQuickStock = async (product: Product) => {
     if (!userBranchId) return;
     const path = `products/${product.id}`;
+    const currentStock = product.stock?.[userBranchId] || 0;
+    const finalStockValue = stockModifyMode === 'add' 
+      ? currentStock + Number(quickStockValue) 
+      : Number(quickStockValue);
+
     try {
       const updatedStockMap = {
         ...(product.stock || {}),
-        [userBranchId]: Number(quickStockValue)
+        [userBranchId]: Math.max(0, finalStockValue)
       };
       await updateDoc(doc(db, 'products', product.id), {
         stock: updatedStockMap
       });
       setQuickStockEditProductId(null);
+      setQuickStockValue(0);
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, path);
     }
@@ -179,8 +198,57 @@ export default function ProductsTab({ currentUserProfile, products, branches }: 
     const path = `products/${productId}`;
     try {
       await deleteDoc(doc(db, 'products', productId));
+      if (onMarkDeleted) {
+        onMarkDeleted(productId);
+      }
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, path);
+      if (onMarkDeleted) {
+        onMarkDeleted(productId);
+      }
+    }
+  };
+
+  const handleQuickInwardSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userBranchId) {
+      alert('You must belong to a physical branch hub to add product quantities.');
+      return;
+    }
+    if (!selectedInwardProductId) {
+      alert('Please select a product item from the catalog.');
+      return;
+    }
+    if (inwardQty <= 0) {
+      alert('Inward quantity must be 1 or higher.');
+      return;
+    }
+
+    const product = products.find(p => p.id === selectedInwardProductId);
+    if (!product) return;
+
+    setInwardSubmitting(true);
+    const path = `products/${product.id}`;
+    const currentStock = product.stock?.[userBranchId] || 0;
+    const nextStock = currentStock + Number(inwardQty);
+
+    try {
+      const updatedStockMap = {
+        ...(product.stock || {}),
+        [userBranchId]: nextStock
+      };
+
+      await updateDoc(doc(db, 'products', product.id), {
+        stock: updatedStockMap
+      });
+
+      setInwardSuccessMessage(`Successfully added ${inwardQty} ${product.unit}(s) of "${product.name}" to your inventory!`);
+      setInwardQty(1);
+      setTimeout(() => setInwardSuccessMessage(''), 4000);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, path);
+    } finally {
+      setInwardSubmitting(false);
     }
   };
 
@@ -226,16 +294,139 @@ export default function ProductsTab({ currentUserProfile, products, branches }: 
           </p>
         </div>
         
-        {isSuperAdmin && (
-          <button
-            id="add-product-btn"
-            onClick={handleOpenAdd}
-            className="flex items-center gap-2 bg-[#3B82F6] text-white hover:bg-[#2563EB] px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-sm"
-          >
-            <Plus className="w-4 h-4" /> Introduce Product
-          </button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {isBranchAdmin && (
+            <button
+              type="button"
+              id="quick-inward-btn"
+              onClick={() => {
+                setShowQuickInward(!showQuickInward);
+                if (!selectedInwardProductId && products.length > 0) {
+                  setSelectedInwardProductId(products[0].id);
+                }
+                setShowAddForm(false);
+              }}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-sm ${
+                showQuickInward 
+                  ? 'bg-slate-700 text-white hover:bg-slate-800' 
+                  : 'bg-emerald-600 text-white hover:bg-emerald-700'
+              }`}
+            >
+              <Plus className="w-4 h-4" /> Quick Stock Inward
+            </button>
+          )}
+
+          {isSuperAdmin && (
+            <button
+              id="add-product-btn"
+              onClick={handleOpenAdd}
+              className="flex items-center gap-2 bg-[#3B82F6] text-white hover:bg-[#2563EB] px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-sm"
+            >
+              <Plus className="w-4 h-4" /> Introduce Product
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Quick Stock Inward Form for Branch Admins */}
+      {showQuickInward && isBranchAdmin && (
+        <form onSubmit={handleQuickInwardSubmit} className="bg-emerald-50/20 border-2 border-emerald-500/20 p-6 rounded-2xl space-y-5 animate-fadeIn">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="text-base font-bold text-slate-800 font-sans">Quick Stock Inward Panel</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Increment inventory immediately for your active hub: <span className="font-semibold text-emerald-700">{activeBranch?.city} Hub</span>.</p>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setShowQuickInward(false)}
+              className="text-slate-400 hover:text-slate-600 text-xs font-bold px-2 py-1 rounded hover:bg-slate-100 cursor-pointer"
+            >
+              ✕ Close
+            </button>
+          </div>
+
+          {inwardSuccessMessage && (
+            <div className="bg-emerald-100 border border-emerald-300 text-emerald-800 px-4 py-3 rounded-xl text-xs font-medium animate-fadeIn flex items-center gap-2">
+              <Check className="w-4 h-4" /> {inwardSuccessMessage}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
+            {/* Product Drops */}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Select Catalog Product</label>
+              <select
+                required
+                value={selectedInwardProductId}
+                onChange={(e) => setSelectedInwardProductId(e.target.value)}
+                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 text-sm cursor-pointer text-slate-700"
+              >
+                <option value="">-- Choose a Product --</option>
+                {products.map(p => {
+                  const currentStock = userBranchId ? (p.stock?.[userBranchId] || 0) : 0;
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {p.name} (SKU: {p.sku}) [Current: {currentStock} {p.unit}s]
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {/* Qty */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Quantity to Add</label>
+              <input
+                type="number"
+                min="1"
+                required
+                value={inwardQty}
+                onChange={(e) => setInwardQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-slate-900/10 text-sm font-mono text-slate-800"
+              />
+            </div>
+          </div>
+
+          {/* Dynamic Preview Card */}
+          {selectedInwardProductId && (() => {
+            const selectedProduct = products.find(p => p.id === selectedInwardProductId);
+            if (!selectedProduct) return null;
+            const currentStock = userBranchId ? (selectedProduct.stock?.[userBranchId] || 0) : 0;
+            const finalStock = currentStock + Number(inwardQty);
+            return (
+              <div className="bg-emerald-500/5 border border-emerald-500/10 px-4 py-3 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+                <div>
+                  <span className="text-slate-500 font-sans">Inwarding Target: </span>
+                  <span className="font-bold text-slate-800 font-sans">{selectedProduct.name}</span>
+                </div>
+                <div className="flex items-center gap-2 font-mono">
+                  <span className="text-slate-500">Current: <strong className="text-slate-700">{currentStock}</strong></span>
+                  <span className="text-emerald-600 font-bold">+{inwardQty}</span>
+                  <span className="text-slate-400">➔</span>
+                  <span className="text-slate-700 font-bold bg-emerald-100 px-2 py-0.5 rounded font-sans">Expected Total: {finalStock} {selectedProduct.unit}s</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-150">
+            <button
+              type="button"
+              onClick={() => setShowQuickInward(false)}
+              className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={inwardSubmitting || !selectedInwardProductId}
+              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-emerald-300 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              {inwardSubmitting ? 'Inwarding...' : 'Complete Inward'}
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Main product entry / modification form */}
       {showAddForm && (
@@ -501,59 +692,132 @@ export default function ProductsTab({ currentUserProfile, products, branches }: 
 
                   <td className="px-6 py-4 text-xs text-slate-600">
                     {/* Multi branch display */}
-                    <div className="space-y-1 max-w-72">
+                    <div className="space-y-1.5 max-w-72">
                       {isBranchAdmin && userBranchId && activeBranch ? (
-                        <div className="flex items-center justify-between border-b border-dashed border-slate-100 pb-1">
-                          <span className="font-medium text-slate-700">{activeBranch.city} Hub:</span>
-                          {quickStockEditProductId === product.id ? (
-                            <div className="flex items-center gap-1 font-mono">
-                              <input
-                                type="number"
-                                min="0"
-                                value={quickStockValue}
-                                onChange={(e) => setQuickStockValue(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                                className="w-16 px-1.5 py-0.5 bg-white border border-slate-300 rounded text-center text-xs font-mono font-bold"
-                              />
-                              <button
-                                onClick={() => handleSaveQuickStock(product)}
-                                className="bg-emerald-600 text-white p-1 rounded hover:bg-emerald-700"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <span className={`font-mono font-bold ${currentHubStock && currentHubStock > 10 ? 'text-slate-900' : currentHubStock && currentHubStock > 0 ? 'text-amber-600' : 'text-rose-600'}`}>
-                                {currentHubStock || 0}
+                        <div className="flex flex-col gap-2">
+                          {/* Active Hub Control */}
+                          <div className="flex flex-col gap-1 border border-indigo-100/60 bg-indigo-50/20 p-2 rounded-xl">
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-slate-800 text-[11px] truncate flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                {activeBranch.city} Hub (You)
                               </span>
-                              <button
-                                onClick={() => {
-                                  setQuickStockValue(currentHubStock || 0);
-                                  setQuickStockEditProductId(product.id);
-                                }}
-                                className="text-slate-400 hover:text-slate-800 font-semibold text-[10px] underline"
-                              >
-                                Edit
-                              </button>
+                              {quickStockEditProductId !== product.id && (
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`font-mono font-bold ${currentHubStock && currentHubStock > 10 ? 'text-slate-900' : currentHubStock && currentHubStock > 0 ? 'text-amber-600' : 'text-rose-600'}`}>
+                                    {currentHubStock || 0}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      setQuickStockValue(0); // Default input to 0 so they can easily type what to ADD
+                                      setStockModifyMode('add'); // Default to Add Stock mode
+                                      setQuickStockEditProductId(product.id);
+                                    }}
+                                    className="text-indigo-650 hover:text-indigo-805 font-bold text-[10px] underline bg-indigo-50 px-1.5 py-0.5 rounded cursor-pointer"
+                                    title="Update stock levels"
+                                  >
+                                    Update
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                          )}
+                            
+                            {quickStockEditProductId === product.id && (
+                              <div className="flex flex-col gap-1.5 bg-white p-2 rounded-lg border border-indigo-200 animate-fadeIn shrink-0">
+                                <div className="flex gap-1 justify-between items-center">
+                                  <span className="text-[9px] font-bold text-slate-500">Method:</span>
+                                  <div className="flex gap-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setStockModifyMode('add');
+                                        setQuickStockValue(0);
+                                      }}
+                                      className={`text-[8px] font-bold px-1.5 py-0.5 rounded transition-all cursor-pointer ${stockModifyMode === 'add' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                                    >
+                                      + Add Item
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setStockModifyMode('set');
+                                        setQuickStockValue(currentHubStock || 0);
+                                      }}
+                                      className={`text-[8px] font-bold px-1.5 py-0.5 rounded transition-all cursor-pointer ${stockModifyMode === 'set' ? 'bg-slate-850 text-white shadow-xs' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                                    >
+                                      Set Total
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 font-mono justify-between">
+                                  <span className="text-xs font-bold text-slate-400 font-sans">
+                                    {stockModifyMode === 'add' ? '+' : '='}
+                                  </span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={quickStockValue}
+                                    onChange={(e) => setQuickStockValue(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                                    className="w-20 px-1.5 py-0.5 bg-white border border-slate-300 rounded text-center text-xs font-mono font-bold text-slate-800"
+                                    placeholder={stockModifyMode === 'add' ? "Qty" : "Total"}
+                                    autoFocus
+                                  />
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={() => handleSaveQuickStock(product)}
+                                      className="bg-[#166534] text-white p-1 rounded hover:bg-[#14532d] shadow-xs cursor-pointer"
+                                      title="Confirm updates"
+                                    >
+                                      <Check className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setQuickStockEditProductId(null);
+                                        setQuickStockValue(0);
+                                      }}
+                                      className="bg-slate-200 hover:bg-slate-300 text-slate-600 p-1 rounded cursor-pointer"
+                                      title="Cancel"
+                                    >
+                                      <span className="text-[10px] px-0.5 font-bold font-sans">✕</span>
+                                    </button>
+                                  </div>
+                                </div>
+                                <span className="text-[9px] text-[#3b82f6] font-sans font-semibold text-right block">
+                                  {stockModifyMode === 'add' 
+                                    ? `Stock increases to: ${(currentHubStock || 0) + Number(quickStockValue)}` 
+                                    : `Stock set directly to: ${Number(quickStockValue)}`}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Other branch stocks display */}
+                          <div className="space-y-1">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Stocks in other hubs:</span>
+                            <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                              {branches.filter(b => b.id !== userBranchId).map(b => {
+                                const bStock = product.stock?.[b.id] || 0;
+                                return (
+                                  <div key={b.id} className="flex justify-between border-r border-slate-150/40 pr-1.5 last:border-0 mr-1.5 last:mr-0">
+                                    <span className="text-slate-500 truncate">{b.city}:</span>
+                                    <span className={`font-mono font-bold ${bStock > 5 ? 'text-slate-750' : bStock > 0 ? 'text-amber-500' : 'text-rose-450'}`}>{bStock}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-                          {branches.slice(0, 3).map(b => {
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] bg-slate-50/50 p-2 rounded-xl border border-slate-100">
+                          {branches.map(b => {
                             const bStock = product.stock?.[b.id] || 0;
                             return (
-                              <div key={b.id} className="flex justify-between border-r border-slate-100 pr-2">
+                              <div key={b.id} className="flex justify-between border-r border-slate-100 pr-2 last:border-0 last:pr-0">
                                 <span className="text-slate-400 truncate">{b.city}:</span>
-                                <span className={`font-mono font-bold ${bStock > 5 ? 'text-slate-700' : bStock > 0 ? 'text-amber-500' : 'text-rose-450'}`}>{bStock}</span>
+                                <span className={`font-mono font-bold ${bStock > 5 ? 'text-slate-700' : bStock > 0 ? 'text-amber-500' : 'text-rose-455'}`}>{bStock}</span>
                               </div>
                             );
                           })}
-                          {branches.length > 3 && (
-                            <div className="text-[10px] text-slate-400 italic col-span-2">
-                              + {branches.length - 3} other branch hubs
-                            </div>
-                          )}
                         </div>
                       )}
                       

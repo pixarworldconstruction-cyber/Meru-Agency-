@@ -30,7 +30,10 @@ export default function UserManagementTab({ currentUserProfile, usersList, branc
   const [newRole, setNewRole] = useState<UserRole>('branch_admin');
   const [newBranchId, setNewBranchId] = useState('');
   const [newHospitalName, setNewHospitalName] = useState('');
+  const [newDiscountRate, setNewDiscountRate] = useState<number>(0);
   const [showPassword, setShowPassword] = useState(false);
+
+  const [targetDiscountRate, setTargetDiscountRate] = useState<number>(0);
 
   const [creationLoading, setCreationLoading] = useState(false);
   const [creationSuccess, setCreationSuccess] = useState('');
@@ -52,6 +55,7 @@ export default function UserManagementTab({ currentUserProfile, usersList, branc
     setEditingUserId(user.uid);
     setTargetRole(user.role);
     setTargetBranchId(user.branchId || '');
+    setTargetDiscountRate(user.discountRate || 0);
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -95,6 +99,7 @@ export default function UserManagementTab({ currentUserProfile, usersList, branc
         role: newRole,
         branchId: newRole === 'branch_admin' ? newBranchId : null,
         hospitalName: newRole === 'hospital' ? (newHospitalName.trim() || 'General Client Clinic') : null,
+        discountRate: newRole === 'hospital' ? Number(newDiscountRate) : 0,
         createdAt: Date.now()
       };
 
@@ -111,6 +116,7 @@ export default function UserManagementTab({ currentUserProfile, usersList, branc
       setNewDisplayName('');
       setNewBranchId('');
       setNewHospitalName('');
+      setNewDiscountRate(0);
     } catch (err: any) {
       console.error("Operational Registry Error: ", err);
       setCreationError(err.message || 'Verification rejected. Could not register account credentials.');
@@ -130,10 +136,18 @@ export default function UserManagementTab({ currentUserProfile, usersList, branc
     const path = `users/${user.uid}`;
     try {
       const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
+      const updateData: any = {
         role: targetRole,
         branchId: targetRole === 'branch_admin' ? (targetBranchId || null) : null,
-      });
+      };
+      
+      if (targetRole === 'hospital') {
+        updateData.discountRate = Number(targetDiscountRate);
+      } else {
+        updateData.discountRate = 0;
+      }
+
+      await updateDoc(userRef, updateData);
       setEditingUserId(null);
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, path);
@@ -295,22 +309,37 @@ export default function UserManagementTab({ currentUserProfile, usersList, branc
                 )}
 
                 {newRole === 'hospital' && (
-                  <>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Partner Clinic / Hospital Name</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-slate-400">
-                        <Landmark className="w-3.5 h-3.5" />
-                      </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Partner Clinic / Hospital Name</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-slate-400">
+                          <Landmark className="w-3.5 h-3.5" />
+                        </span>
+                        <input
+                          type="text"
+                          required
+                          value={newHospitalName}
+                          onChange={(e) => setNewHospitalName(e.target.value)}
+                          placeholder="e.g. St. Jude Surgical Center"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:ring-1 focus:ring-indigo-555 focus:outline-hidden text-slate-800"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Partner Discount rate (%)</label>
                       <input
-                        type="text"
+                        type="number"
+                        min="0"
+                        max="100"
                         required
-                        value={newHospitalName}
-                        onChange={(e) => setNewHospitalName(e.target.value)}
-                        placeholder="e.g. St. Jude Surgical Center"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:ring-1 focus:ring-indigo-505 focus:outline-hidden text-slate-800"
+                        value={newDiscountRate}
+                        onChange={(e) => setNewDiscountRate(Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+                        placeholder="e.g. 15 for 15%"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-indigo-555 focus:outline-hidden text-slate-800 font-semibold font-mono"
                       />
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {newRole === 'super_admin' && (
@@ -407,19 +436,41 @@ export default function UserManagementTab({ currentUserProfile, usersList, branc
                     {/* Role badge or editor */}
                     <td className="px-6 py-4">
                       {isEditing ? (
-                        <select
-                          value={targetRole}
-                          onChange={(e) => setTargetRole(e.target.value as UserRole)}
-                          className="text-xs bg-white border border-slate-300 rounded px-2 py-1 font-semibold focus:outline-hidden text-slate-800"
-                        >
-                          <option value="super_admin">Super Admin</option>
-                          <option value="branch_admin">Branch Admin</option>
-                          <option value="hospital">Hospital User (Client)</option>
-                        </select>
+                        <div className="flex flex-col gap-1.5 bg-slate-50 p-1.5 rounded border border-slate-205 max-w-[140px] animate-fadeIn">
+                          <select
+                            value={targetRole}
+                            onChange={(e) => setTargetRole(e.target.value as UserRole)}
+                            className="text-xs bg-white border border-slate-300 rounded px-2 py-1 font-semibold focus:outline-hidden text-slate-800 cursor-pointer w-full"
+                          >
+                            <option value="super_admin">Super Admin</option>
+                            <option value="branch_admin">Branch Admin</option>
+                            <option value="hospital">Hospital User (Client)</option>
+                          </select>
+                          {targetRole === 'hospital' && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-slate-500 font-bold whitespace-nowrap">Disc %:</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={targetDiscountRate}
+                                onChange={(e) => setTargetDiscountRate(Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+                                className="w-12 text-xs bg-white border border-slate-300 rounded px-1.5 py-0.5 font-mono font-bold text-slate-800"
+                              />
+                            </div>
+                          )}
+                        </div>
                       ) : (
-                        <span className={`text-[10px] font-bold uppercase tracking-wider border rounded-full px-2.5 py-1 ${getRoleBadgeColor(user.role)}`}>
-                          {user.role === 'super_admin' ? 'Super Admin' : user.role === 'branch_admin' ? 'Branch Admin' : 'Hospital User'}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider border rounded-full px-2.5 py-1 ${getRoleBadgeColor(user.role)}`}>
+                            {user.role === 'super_admin' ? 'Super Admin' : user.role === 'branch_admin' ? 'Branch Admin' : 'Hospital User'}
+                          </span>
+                          {user.role === 'hospital' && (
+                            <span className="text-[10px] text-[#166534] bg-[#DCFCE7]/65 px-1.5 py-0.5 rounded border border-emerald-200/40 font-mono font-bold mt-0.5">
+                              {user.discountRate || 0}% Off
+                            </span>
+                          )}
+                        </div>
                       )}
                     </td>
 
