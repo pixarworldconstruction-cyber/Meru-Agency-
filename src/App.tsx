@@ -27,7 +27,7 @@ import {
   Truck, Building2, ShoppingBag, ShieldCheck, 
   Users, LogOut, Loader2, Hospital, Key, Lock, 
   Mail, ClipboardCheck, ArrowRight, CheckCircle2, ShieldAlert,
-  BarChart2
+  BarChart2, ChevronLeft, ChevronRight, Menu, X
 } from 'lucide-react';
 
 // High-fidelity fallback lists to ensure the interface is beautifully populated even if the client is offline
@@ -136,7 +136,9 @@ export default function App() {
   const [deletedBranchIds, setDeletedBranchIds] = useState<string[]>([]);
 
   // UI Navigation Tabs
-  const [activeTab, setActiveTab] = useState<'products' | 'branches' | 'deliveries' | 'coordination' | 'analytics'>('products');
+  const [activeTab, setActiveTab ] = useState<'products' | 'branches' | 'deliveries' | 'coordination' | 'analytics'>('products');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Manual Credentials Inputs
   const [email, setEmail] = useState('');
@@ -700,21 +702,39 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#F8FAFC] text-[#0F172A] selection:bg-blue-600/10 font-sans">
       
-      {/* 1. Left Navigation Sidebar */}
-      <aside className="w-full md:w-[260px] md:sticky md:top-0 md:h-screen shrink-0 bg-[#0F172A] text-[#F8FAFC] p-6 flex flex-col justify-between border-r border-[#1E293B]">
+      {/* Mobile Drawer Overlay Backdrop */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 md:hidden transition-opacity duration-300" 
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar for Mobile View (Slide-over drawer) */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-[270px] bg-[#0F172A] text-[#F8FAFC] p-6 flex flex-col justify-between border-r border-[#1E293B] shadow-2xl md:hidden transform transition-transform duration-300 ease-in-out ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div>
-          {/* Logo element matching template */}
-          <div className="mb-10 flex items-center gap-3">
-            <div className="w-8 h-8 bg-[#3B82F6] rounded-md flex items-center justify-center font-black text-white text-base">
-              M
+          {/* Logo & Close Button inside Mobile Drawer */}
+          <div className="mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-[#3B82F6] rounded-md flex items-center justify-center font-black text-white text-base">
+                M
+              </div>
+              <div>
+                <div className="font-bold text-base text-white tracking-tight leading-tight">Meru Medical</div>
+                <div className="text-[9px] opacity-60 font-black tracking-widest uppercase text-[#3B82F6]">LOGISTICS PRO</div>
+              </div>
             </div>
-            <div>
-              <div className="font-bold text-base text-white tracking-tight leading-tight">Meru Medical</div>
-              <div className="text-[9px] opacity-60 font-black tracking-widest uppercase text-[#3B82F6]">LOGISTICS PRO</div>
-            </div>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(false)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              title="Close Navigation"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Dynamic page routes mapped to the side menu */}
+          {/* Navigation Links inside Mobile Drawer */}
           <nav className="space-y-1">
             {isHospital ? (
               <div className="flex items-center gap-3 px-4 py-3 bg-[#1E293B] text-[#3B82F6] rounded-lg font-medium text-sm">
@@ -725,7 +745,10 @@ export default function App() {
               <>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('products')}
+                  onClick={() => {
+                    setActiveTab('products');
+                    setMobileMenuOpen(false);
+                  }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === 'products' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
                 >
                   <ShoppingBag className="w-4 h-4 shrink-0" />
@@ -734,7 +757,10 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={() => setActiveTab('deliveries')}
+                  onClick={() => {
+                    setActiveTab('deliveries');
+                    setMobileMenuOpen(false);
+                  }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === 'deliveries' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
                 >
                   <Truck className="w-4 h-4 shrink-0" />
@@ -746,7 +772,10 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={() => setActiveTab('branches')}
+                  onClick={() => {
+                    setActiveTab('branches');
+                    setMobileMenuOpen(false);
+                  }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === 'branches' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
                 >
                   <Building2 className="w-4 h-4 shrink-0" />
@@ -756,7 +785,10 @@ export default function App() {
                 {isSuperAdmin && (
                   <button
                     type="button"
-                    onClick={() => setActiveTab('coordination')}
+                    onClick={() => {
+                      setActiveTab('coordination');
+                      setMobileMenuOpen(false);
+                    }}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === 'coordination' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
                   >
                     <Users className="w-4 h-4 shrink-0" />
@@ -766,7 +798,10 @@ export default function App() {
 
                 <button
                   type="button"
-                  onClick={() => setActiveTab('analytics')}
+                  onClick={() => {
+                    setActiveTab('analytics');
+                    setMobileMenuOpen(false);
+                  }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === 'analytics' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
                 >
                   <BarChart2 className="w-4 h-4 shrink-0" />
@@ -777,7 +812,7 @@ export default function App() {
           </nav>
         </div>
 
-        {/* User Identity and Connection state at the bottom */}
+        {/* Identity & LogOut inside Mobile Drawer */}
         <div className="mt-8 pt-6 border-t border-[#1E293B] space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-slate-800 text-[#3B82F6] border border-slate-700 flex items-center justify-center font-bold text-xs shrink-0 select-none">
@@ -790,7 +825,10 @@ export default function App() {
           </div>
           <button
             type="button"
-            onClick={handleLogout}
+            onClick={() => {
+              handleLogout();
+              setMobileMenuOpen(false);
+            }}
             className="w-full py-2.5 bg-slate-800/65 text-slate-300 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 hover:bg-rose-955/25 hover:text-rose-400 border border-slate-700/60 transition-all cursor-pointer"
             title="Sign Out of Terminal"
           >
@@ -800,32 +838,208 @@ export default function App() {
         </div>
       </aside>
 
+      {/* 1. Left Navigation Sidebar (Desktop version, collapsible) */}
+      <aside 
+        className={`hidden md:flex flex-col justify-between shrink-0 bg-[#0F172A] text-[#F8FAFC] border-r border-[#1E293B] transition-all duration-300 ease-in-out md:sticky md:top-0 md:h-screen ${
+          sidebarCollapsed ? 'w-[76px] p-3' : 'w-[260px] p-6'
+        }`}
+      >
+        <div>
+          {/* Logo element with Collapse/Expand Action Button */}
+          <div className={`mb-10 flex items-center justify-between ${sidebarCollapsed ? 'justify-center' : ''}`}>
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="w-8 h-8 bg-[#3B82F6] rounded-md flex items-center justify-center font-black text-white text-base shrink-0 select-none">
+                M
+              </div>
+              {!sidebarCollapsed && (
+                <div className="transition-all duration-300 whitespace-nowrap animate-fade-in">
+                  <div className="font-bold text-base text-white tracking-tight leading-tight">Meru Medical</div>
+                  <div className="text-[9px] opacity-60 font-black tracking-widest uppercase text-[#3B82F6]">LOGISTICS PRO</div>
+                </div>
+              )}
+            </div>
+            {!sidebarCollapsed && (
+              <button
+                type="button"
+                onClick={() => setSidebarCollapsed(true)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                title="Collapse Sidebar"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Unfold Arrow trigger visible ONLY when collapsed */}
+          {sidebarCollapsed && (
+            <div className="flex justify-center mb-8">
+              <button
+                type="button"
+                onClick={() => setSidebarCollapsed(false)}
+                className="p-1.5 rounded-lg bg-slate-800 text-slate-200 hover:text-white hover:bg-[#3B82F6] transition shadow-md cursor-pointer"
+                title="Expand Sidebar"
+              >
+                <ChevronRight className="w-4.5 h-4.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Dynamic page routes mapped to the side menu */}
+          <nav className="space-y-1.5">
+            {isHospital ? (
+              <div 
+                className={`flex items-center bg-[#1E293B] text-[#3B82F6] rounded-lg font-medium text-sm ${sidebarCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3'}`}
+                title="Hospital Orders"
+              >
+                <Hospital className="w-4 h-4 text-[#3B82F6] shrink-0" />
+                {!sidebarCollapsed && <span className="text-sm font-semibold">Hospital Orders</span>}
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('products')}
+                  className={`w-full flex items-center rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                    sidebarCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3'
+                  } ${activeTab === 'products' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
+                  title="Inventory Control"
+                >
+                  <ShoppingBag className="w-4 h-4 shrink-0" />
+                  {!sidebarCollapsed && <span className="whitespace-nowrap transition-opacity">Inventory Control</span>}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('deliveries')}
+                  className={`w-full flex items-center rounded-lg text-sm font-semibold transition-all cursor-pointer relative ${
+                    sidebarCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3'
+                  } ${activeTab === 'deliveries' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
+                  title="Hospital Orders"
+                >
+                  <Truck className="w-4 h-4 shrink-0" />
+                  {!sidebarCollapsed ? (
+                    <>
+                      <span className="flex-1 text-left whitespace-nowrap">Hospital Orders</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activeTab === 'deliveries' ? 'bg-[#3B82F6] text-[#0F172A]' : 'bg-slate-800 text-slate-400'}`}>
+                        {deliveries.length}
+                      </span>
+                    </>
+                  ) : (
+                    deliveries.length > 0 && (
+                      <span className="absolute top-1 right-1 bg-[#3B82F6] text-[#0F172A] text-[9px] font-black w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-[#0F172A]">
+                        {deliveries.length}
+                      </span>
+                    )
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('branches')}
+                  className={`w-full flex items-center rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                    sidebarCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3'
+                  } ${activeTab === 'branches' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
+                  title="Branch Network"
+                >
+                  <Building2 className="w-4 h-4 shrink-0" />
+                  {!sidebarCollapsed && <span className="whitespace-nowrap">Branch Network</span>}
+                </button>
+
+                {isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('coordination')}
+                    className={`w-full flex items-center rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                      sidebarCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3'
+                    } ${activeTab === 'coordination' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
+                    title="Staff Directory"
+                  >
+                    <Users className="w-4 h-4 shrink-0" />
+                    {!sidebarCollapsed && <span className="whitespace-nowrap">Staff Directory</span>}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('analytics')}
+                  className={`w-full flex items-center rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                    sidebarCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3'
+                  } ${activeTab === 'analytics' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
+                  title="Business Analytics"
+                >
+                  <BarChart2 className="w-4 h-4 shrink-0" />
+                  {!sidebarCollapsed && <span className="whitespace-nowrap">Business Analytics</span>}
+                </button>
+              </>
+            )}
+          </nav>
+        </div>
+
+        {/* User Identity and Connection state at the bottom */}
+        <div className={`mt-8 pt-6 border-t border-[#1E293B] flex ${sidebarCollapsed ? 'flex-col items-center gap-4' : 'flex-col gap-4'}`}>
+          <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
+            <div className="w-8 h-8 rounded-full bg-slate-800 text-[#3B82F6] border border-slate-700 flex items-center justify-center font-bold text-xs shrink-0 select-none">
+              {userProfile.displayName ? userProfile.displayName.substring(0, 2).toUpperCase() : 'ME'}
+            </div>
+            {!sidebarCollapsed && (
+              <div className="min-w-0 flex-1 animate-fade-in font-sans">
+                <div className="text-[10px] text-[#64748B] font-mono font-bold uppercase tracking-wider">Firebase Connected</div>
+                <div className="text-sm font-semibold truncate text-white leading-tight mt-0.5">{userProfile.displayName}</div>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={`flex items-center justify-center border border-slate-700/60 rounded-lg hover:bg-rose-950/20 hover:text-rose-400 transition-all cursor-pointer ${
+              sidebarCollapsed ? 'p-2.5 w-10 h-10 bg-slate-800/65 text-slate-300' : 'w-full py-2.5 bg-slate-800/65 text-slate-300 text-xs font-semibold gap-2'
+            }`}
+            title="Sign Out of Terminal"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            {!sidebarCollapsed && <span>Sign Out</span>}
+          </button>
+        </div>
+      </aside>
+
       {/* 2. Main Content Right Panel */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-grow flex flex-col min-h-screen min-w-0">
         
         {/* Header Bar Area */}
         <header className="h-20 bg-white border-b border-[#E2E8F0] flex items-center justify-between px-6 sm:px-8 shrink-0">
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-[#0F172A] tracking-tight">
-              {isHospital 
-                ? 'Central Procurement Hub' 
-                : activeTab === 'products'
-                  ? 'Central Inventory Control'
-                  : activeTab === 'deliveries'
-                    ? 'Hospital Consignment Logs'
-                    : activeTab === 'branches'
-                      ? 'Physical Branch Network'
-                      : activeTab === 'analytics'
-                        ? 'Operational Intelligence Dashboard'
-                        : 'Operational Staff Directory'}
-            </h1>
-            <p className="text-xs text-slate-500 mt-1 hidden sm:block">
-              {isHospital 
-                ? 'Review product catalogue supplies and request rapid consignment logistics.' 
-                : activeTab === 'analytics'
-                  ? 'Check overall and regional delivery sales, partner discounts, and supply stats.'
-                  : 'Configure stocks, track deliveries, and manage branches.'}
-            </p>
+          <div className="flex items-center gap-3">
+            {/* Mobile Menu Action Button toggles sidebar on small viewports */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden p-2 -ml-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all cursor-pointer"
+              title="Open Navigation Menu"
+            >
+              <Menu className="w-5.5 h-5.5" />
+            </button>
+
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold text-[#0F172A] tracking-tight">
+                {isHospital 
+                  ? 'Central Procurement Hub' 
+                  : activeTab === 'products'
+                    ? 'Central Inventory Control'
+                    : activeTab === 'deliveries'
+                      ? 'Hospital Consignment Logs'
+                      : activeTab === 'branches'
+                        ? 'Physical Branch Network'
+                        : activeTab === 'analytics'
+                          ? 'Operational Intelligence Dashboard'
+                          : 'Operational Staff Directory'}
+              </h1>
+              <p className="text-xs text-slate-500 mt-1 hidden sm:block">
+                {isHospital 
+                  ? 'Review product catalogue supplies and request rapid consignment logistics.' 
+                  : activeTab === 'analytics'
+                    ? 'Check overall and regional delivery sales, partner discounts, and supply stats.'
+                    : 'Configure stocks, track deliveries, and manage branches.'}
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
