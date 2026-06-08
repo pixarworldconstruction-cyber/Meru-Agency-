@@ -1,0 +1,120 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function getUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUser().role == 'super_admin';
+    }
+
+    function isBranchAdmin(branchId) {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUser().role == 'branch_admin' && getUser().branchId == branchId;
+    }
+
+    // Default catch-all denies all operations
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 1. Users Profile Collection
+    match /users/{userId} {
+      // Users can view their own profile, Super Admins can list and view all profiles
+      allow get: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin());
+      allow list: if isSuperAdmin();
+
+      // On creation, restrict self-promotion. Users are registered with standard role 'hospital'
+      allow create: if isSignedIn() && request.auth.uid == userId && incoming().role == 'hospital';
+
+      // Updates: standard users can edit name or clinic details, but never escalate their own role/branch
+      allow update: if (
+        isSignedIn() && request.auth.uid == userId && 
+        incoming().role == existing().role && 
+        incoming().branchId == existing().branchId
+      ) || isSuperAdmin();
+
+      allow delete: if isSuperAdmin();
+    }
+
+    // 2. Regional Branches Collection
+    match /branches/{branchId} {
+      // Anyone signed in can read branches to map order branches
+      allow read: if isSignedIn();
+      // Only corporate Super Admin can create, modify, or delete physical hubs
+      allow write: if isSuperAdmin();
+    }
+
+    // 3. Products Catalogue Collection
+    match /products/{productId} {
+      // Anyone signed in can browse catalogue
+      allow read: if isSignedIn();
+
+      // Catalog additions and deletions are reserved for Super Admins
+      allow create, delete: if isSuperAdmin();
+
+      // Updates: 
+      // - Super Admins can modify everything
+      // - Branch Admins can ONLY update the stock mapping for their assigned branchId
+      allow update: if isSuperAdmin() || (
+        isSignedIn() && getUser().role == 'branch_admin' && 
+        incoming().name == existing().name &&
+        incoming().sku == existing().sku &&
+        incoming().price == existing().price &&
+        incoming().category == existing().category &&
+        incoming().stock.diff(existing().stock).affectedKeys().hasOnly([getUser().branchId])
+      );
+    }
+
+    // 4. Consignments & Deliveries Collection
+    match /deliveries/{deliveryId} {
+      // Read constraints:
+      // - Super Admin can view all
+      // - Branch Admin can only view deliveries assigned to their branchId
+      // - Hospital users can only view their own orders
+      allow get: if isSuperAdmin() || (
+        isSignedIn() && existing().branchId == getUser().branchId && getUser().role == 'branch_admin'
+      ) || (
+        isSignedIn() && existing().hospitalUid == request.auth.uid
+      );
+
+      allow list: if isSuperAdmin() || (
+        isSignedIn() && resource.data.branchId == getUser().branchId && getUser().role == 'branch_admin'
+      ) || (
+        isSignedIn() && resource.data.hospitalUid == request.auth.uid
+      );
+
+      // Create: Hospital clients can order items
+      allow create: if isSignedIn() && incoming().hospitalUid == request.auth.uid;
+
+      // Update transitions:
+      // - Super Admin can do any status modification
+      // - Assigned Branch Admin can update order states
+      // - Hospital clients can cancel their own orders ONLY when the order is still "pending"
+      allow update: if isSuperAdmin() || (
+        isSignedIn() && getUser().role == 'branch_admin' && incoming().branchId == getUser().branchId
+      ) || (
+        isSignedIn() && existing().hospitalUid == request.auth.uid && 
+        incoming().status == 'cancelled' && 
+        existing().status == 'pending' &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+      );
+
+      allow delete: if isSuperAdmin();
+    }
+  }
+}

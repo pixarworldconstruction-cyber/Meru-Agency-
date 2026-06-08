@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "The administrative profile and role permission of the logged-in user",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["super_admin", "branch_admin", "hospital"] },
+        "branchId": { "type": "string" },
+        "hospitalName": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["uid", "email", "role", "createdAt"]
+    },
+    "Branch": {
+      "title": "Branch",
+      "description": "A regional physical branch office with stock management capability",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "city": { "type": "string" },
+        "address": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["name", "city", "address", "contactPhone", "createdAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "A sterile surgical supply product available for dispatch to regional centres",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "unit": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "stock": { "type": "object" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["name", "sku", "category", "description", "price", "unit", "stock", "createdAt"]
+    },
+    "DeliveryOrder": {
+      "title": "DeliveryOrder",
+      "description": "A medical supply request scheduled by a hospital destined for delivery from a branch",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "hospitalUid": { "type": "string" },
+        "hospitalName": { "type": "string" },
+        "city": { "type": "string" },
+        "address": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "items": { "type": "array" },
+        "branchId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "preparing", "shipping", "delivered", "cancelled"] },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["hospitalUid", "hospitalName", "city", "address", "contactPhone", "items", "branchId", "status", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles with custom logistical access levels"
+    },
+    "/branches/{branchId}": {
+      "schema": "Branch",
+      "description": "Operational offices routing hospitals in specific city sectors"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Product listings holding quantities per warehouse"
+    },
+    "/deliveries/{deliveryId}": {
+      "schema": "DeliveryOrder",
+      "description": "Consignment requests that regional branch coordinators dispatch dynamically"
+    }
+  }
+}

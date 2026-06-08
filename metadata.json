@@ -1,0 +1,6 @@
+{
+  "name": "Medical Supply Delivery Portal",
+  "description": "A logistics management platform for delivering medical operation items to hospitals with branch-wise administration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
