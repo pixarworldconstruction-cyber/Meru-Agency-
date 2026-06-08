@@ -104,3 +104,22 @@ export interface ActivityLog {
   details: string;
   timestamp: number;
 }
+
+export type TransferStatus = 'pending' | 'completed' | 'cancelled';
+
+export interface TransferDemand {
+  id: string;
+  demandingBranchId: string;
+  demandingBranchName: string;
+  supplyingBranchId: string;
+  supplyingBranchName: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  quantity: number;
+  status: TransferStatus;
+  createdAt: number;
+  updatedAt: number;
+  requestedBy: string; // email of the user making the demand
+  resolvedBy?: string; // email of the user confirming/cancelling the demand
+}

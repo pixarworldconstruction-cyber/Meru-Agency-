@@ -81,6 +81,28 @@
         "updatedAt": { "type": "number" }
       },
       "required": ["branchId", "hospitalUid", "productId", "discountPercent", "createdAt", "updatedAt"]
+    },
+    "TransferDemand": {
+      "title": "TransferDemand",
+      "description": "Internal branch to branch stock transfer request and fulfillment records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "demandingBranchId": { "type": "string" },
+        "demandingBranchName": { "type": "string" },
+        "supplyingBranchId": { "type": "string" },
+        "supplyingBranchName": { "type": "string" },
+        "productId": { "type": "string" },
+        "productName": { "type": "string" },
+        "sku": { "type": "string" },
+        "quantity": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "completed", "cancelled"] },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" },
+        "requestedBy": { "type": "string" },
+        "resolvedBy": { "type": "string" }
+      },
+      "required": ["demandingBranchId", "demandingBranchName", "supplyingBranchId", "supplyingBranchName", "productId", "productName", "sku", "quantity", "status", "createdAt", "updatedAt", "requestedBy"]
     }
   },
   "firestore": {
@@ -103,6 +125,10 @@
     "/discounts/{discountId}": {
       "schema": "BranchDiscount",
       "description": "Product-specific discounts given to hospital clients in regional hubs"
+    },
+    "/transfers/{transferId}": {
+      "schema": "TransferDemand",
+      "description": "Internal stock transfer orders between different supply hubs"
     }
   }
 }

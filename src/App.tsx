@@ -15,7 +15,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
-import { UserProfile, Branch, Product, DeliveryOrder, UserRole, BranchDiscount } from './types';
+import { UserProfile, Branch, Product, DeliveryOrder, UserRole, BranchDiscount, TransferDemand } from './types';
 import BranchesTab from './components/BranchesTab';
 import ProductsTab from './components/ProductsTab';
 import DeliveriesTab from './components/DeliveriesTab';
@@ -23,12 +23,13 @@ import HospitalClientView from './components/HospitalClientView';
 import UserManagementTab from './components/UserManagementTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import DiscountsTab from './components/DiscountsTab';
+import TransfersTab from './components/TransfersTab';
 
 import { 
   Truck, Building2, ShoppingBag, ShieldCheck, 
   Users, LogOut, Loader2, Hospital, Key, Lock, 
   Mail, ClipboardCheck, ArrowRight, CheckCircle2, ShieldAlert,
-  BarChart2, ChevronLeft, ChevronRight, Menu, X, Tag
+  BarChart2, ChevronLeft, ChevronRight, Menu, X, Tag, ArrowRightLeft
 } from 'lucide-react';
 
 // High-fidelity fallback lists to ensure the interface is beautifully populated even if the client is offline
@@ -134,11 +135,12 @@ export default function App() {
   const [deliveries, setDeliveries] = useState<DeliveryOrder[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [discounts, setDiscounts] = useState<BranchDiscount[]>([]);
+  const [transfers, setTransfers] = useState<TransferDemand[]>([]);
   const [deletedProductIds, setDeletedProductIds] = useState<string[]>([]);
   const [deletedBranchIds, setDeletedBranchIds] = useState<string[]>([]);
 
   // UI Navigation Tabs
-  const [activeTab, setActiveTab ] = useState<'products' | 'branches' | 'deliveries' | 'coordination' | 'analytics' | 'discounts'>('products');
+  const [activeTab, setActiveTab ] = useState<'products' | 'branches' | 'deliveries' | 'coordination' | 'analytics' | 'discounts' | 'transfers'>('products');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -309,6 +311,13 @@ export default function App() {
       console.warn("Permission restricted for discounts: ", err);
     });
 
+    const unsubTransfers = onSnapshot(collection(db, 'transfers'), (snapshot) => {
+      const transferList = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as TransferDemand));
+      setTransfers(transferList);
+    }, (err) => {
+      console.warn("Permission restricted for transfers: ", err);
+    });
+
     // Sync all users directory - only accessible to authorized admins, we'll gracefully ignore on permission error
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const usersList = snapshot.docs.map(d => d.data() as UserProfile);
@@ -323,6 +332,7 @@ export default function App() {
       unsubDeliveries();
       unsubUsers();
       unsubDiscounts();
+      unsubTransfers();
     };
   }, [currentUser]);
 
@@ -825,6 +835,20 @@ export default function App() {
                   </button>
                 )}
 
+                {(isSuperAdmin || isBranchAdmin) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('transfers');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === 'transfers' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
+                  >
+                    <ArrowRightLeft className="w-4 h-4 shrink-0" />
+                    <span>Branch Transfers</span>
+                  </button>
+                )}
+
                 {isSuperAdmin && (
                   <button
                     type="button"
@@ -999,6 +1023,20 @@ export default function App() {
                   >
                     <Tag className="w-4 h-4 shrink-0" />
                     {!sidebarCollapsed && <span className="whitespace-nowrap">Branch Discounts</span>}
+                  </button>
+                )}
+
+                {(isSuperAdmin || isBranchAdmin) && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('transfers')}
+                    className={`w-full flex items-center rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                      sidebarCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3'
+                    } ${activeTab === 'transfers' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
+                    title="Branch Transfers"
+                  >
+                    <ArrowRightLeft className="w-4 h-4 shrink-0" />
+                    {!sidebarCollapsed && <span className="whitespace-nowrap">Branch Transfers</span>}
                   </button>
                 )}
 
@@ -1199,6 +1237,15 @@ export default function App() {
                   deliveries={deliveries}
                   branches={activeBranches}
                   products={activeProducts}
+                />
+              )}
+
+              {activeTab === 'transfers' && (isSuperAdmin || isBranchAdmin) && (
+                <TransfersTab 
+                  currentUserProfile={userProfile}
+                  branches={activeBranches}
+                  products={activeProducts}
+                  transfers={transfers}
                 />
               )}
             </>
