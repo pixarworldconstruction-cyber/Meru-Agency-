@@ -35,5 +35,11 @@ service cloud.firestore {
       // Allow read and write for signed-in users to place, prepare, ship, or cancel orders
       allow read, write: if isSignedIn();
     }
+
+    // 5. Product-specific Discounts Collection
+    match /discounts/{discountId} {
+      // Allow read and write for signed-in users so discounts are securely fetched and set
+      allow read, write: if isSignedIn();
+    }
   }
 }

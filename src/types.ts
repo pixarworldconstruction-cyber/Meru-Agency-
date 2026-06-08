@@ -1,5 +1,12 @@
 export type UserRole = 'super_admin' | 'branch_admin' | 'hospital';
 
+export interface UserStaffMember {
+  id: string;
+  name: string;
+  phone: string;
+  designation: string;
+}
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -12,6 +19,7 @@ export interface UserProfile {
   hospitalAddress?: string | null;  // Hospital's physical delivery or operating address
   coordinatorName?: string | null; // Point of contact coordinator person name
   hospitalPhone?: string | null;    // Phone number for coordination
+  staffList?: UserStaffMember[];    // Clinical authorized staff members (up to 3)
   createdAt: number;
 }
 
@@ -21,6 +29,7 @@ export interface Branch {
   city: string;
   address: string;
   contactPhone: string;
+  discounts?: BranchDiscount[]; // Nested fallback discounts to bypass Firestore rules limitations
   createdAt: number;
 }
 
@@ -44,9 +53,23 @@ export interface DeliveryItem {
   sku: string;
   quantity: number;
   price: number;
+  appliedDiscountRate?: number;
+  appliedDiscountAmount?: number;
+  isProductSpecific?: boolean;
+}
+
+export interface BranchDiscount {
+  id: string;
+  branchId: string;
+  hospitalUid: string;
+  productId: string;
+  discountPercent: number;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export type DeliveryStatus = 'pending' | 'preparing' | 'shipping' | 'delivered' | 'cancelled';
+export type PaymentStatus = 'pending' | 'partially_paid' | 'paid';
 
 export interface DeliveryOrder {
   id: string;
@@ -64,6 +87,13 @@ export interface DeliveryOrder {
   discountPercent?: number;  // Saved discount percentage (e.g., 10 for 10%)
   discountAmount?: number;   // Calculated discount amount subtracted
   finalTotal?: number;       // Calculated total price after discount
+  
+  // Financial & Payment Metrics
+  paymentStatus?: PaymentStatus; // pending, partially_paid, paid
+  advancePayment?: number;       // Any advance payment received
+  lumpSumPayment?: number;       // Total lump sum payments received
+  outstandingBalance?: number;   // Calculated left to pay
+  orderedByStaff?: string;       // Name of user/person placing the order (max 3 person concept)
 }
 
 export interface ActivityLog {

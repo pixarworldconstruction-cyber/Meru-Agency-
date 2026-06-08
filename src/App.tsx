@@ -15,19 +15,20 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
-import { UserProfile, Branch, Product, DeliveryOrder, UserRole } from './types';
+import { UserProfile, Branch, Product, DeliveryOrder, UserRole, BranchDiscount } from './types';
 import BranchesTab from './components/BranchesTab';
 import ProductsTab from './components/ProductsTab';
 import DeliveriesTab from './components/DeliveriesTab';
 import HospitalClientView from './components/HospitalClientView';
 import UserManagementTab from './components/UserManagementTab';
 import AnalyticsTab from './components/AnalyticsTab';
+import DiscountsTab from './components/DiscountsTab';
 
 import { 
   Truck, Building2, ShoppingBag, ShieldCheck, 
   Users, LogOut, Loader2, Hospital, Key, Lock, 
   Mail, ClipboardCheck, ArrowRight, CheckCircle2, ShieldAlert,
-  BarChart2, ChevronLeft, ChevronRight, Menu, X
+  BarChart2, ChevronLeft, ChevronRight, Menu, X, Tag
 } from 'lucide-react';
 
 // High-fidelity fallback lists to ensure the interface is beautifully populated even if the client is offline
@@ -132,13 +133,33 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCT_FALLBACKS);
   const [deliveries, setDeliveries] = useState<DeliveryOrder[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [discounts, setDiscounts] = useState<BranchDiscount[]>([]);
   const [deletedProductIds, setDeletedProductIds] = useState<string[]>([]);
   const [deletedBranchIds, setDeletedBranchIds] = useState<string[]>([]);
 
   // UI Navigation Tabs
-  const [activeTab, setActiveTab ] = useState<'products' | 'branches' | 'deliveries' | 'coordination' | 'analytics'>('products');
+  const [activeTab, setActiveTab ] = useState<'products' | 'branches' | 'deliveries' | 'coordination' | 'analytics' | 'discounts'>('products');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Compute merged discounts from both collection and branches fallback
+  const mergedDiscounts = React.useMemo(() => {
+    const map = new Map<string, BranchDiscount>();
+    
+    // Add branch-embedded ones first
+    branches.forEach(b => {
+      (b.discounts || []).forEach(d => {
+        map.set(`${d.branchId}-${d.hospitalUid}-${d.productId}`, d);
+      });
+    });
+
+    // Overwrite with root level database collection ones if they exist
+    discounts.forEach(d => {
+      map.set(`${d.branchId}-${d.hospitalUid}-${d.productId}`, d);
+    });
+
+    return Array.from(map.values());
+  }, [discounts, branches]);
 
   // Manual Credentials Inputs
   const [email, setEmail] = useState('');
@@ -281,6 +302,13 @@ export default function App() {
       console.warn("Permission restricted for deliveries: ", err);
     });
 
+    const unsubDiscounts = onSnapshot(collection(db, 'discounts'), (snapshot) => {
+      const discountList = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as BranchDiscount));
+      setDiscounts(discountList);
+    }, (err) => {
+      console.warn("Permission restricted for discounts: ", err);
+    });
+
     // Sync all users directory - only accessible to authorized admins, we'll gracefully ignore on permission error
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const usersList = snapshot.docs.map(d => d.data() as UserProfile);
@@ -294,6 +322,7 @@ export default function App() {
       unsubProducts();
       unsubDeliveries();
       unsubUsers();
+      unsubDiscounts();
     };
   }, [currentUser]);
 
@@ -782,6 +811,20 @@ export default function App() {
                   <span>Branch Network</span>
                 </button>
 
+                {(isSuperAdmin || isBranchAdmin) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('discounts');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === 'discounts' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
+                  >
+                    <Tag className="w-4 h-4 shrink-0" />
+                    <span>Branch Discounts</span>
+                  </button>
+                )}
+
                 {isSuperAdmin && (
                   <button
                     type="button"
@@ -945,6 +988,20 @@ export default function App() {
                   {!sidebarCollapsed && <span className="whitespace-nowrap">Branch Network</span>}
                 </button>
 
+                {(isSuperAdmin || isBranchAdmin) && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('discounts')}
+                    className={`w-full flex items-center rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                      sidebarCollapsed ? 'justify-center p-3' : 'gap-3 px-4 py-3'
+                    } ${activeTab === 'discounts' ? 'bg-[#1E293B] text-[#3B82F6]' : 'text-[#64748B] hover:bg-white/5 hover:text-white'}`}
+                    title="Branch Discounts"
+                  >
+                    <Tag className="w-4 h-4 shrink-0" />
+                    {!sidebarCollapsed && <span className="whitespace-nowrap">Branch Discounts</span>}
+                  </button>
+                )}
+
                 {isSuperAdmin && (
                   <button
                     type="button"
@@ -1086,6 +1143,8 @@ export default function App() {
               currentUserProfile={userProfile}
               products={activeProducts}
               branches={activeBranches}
+              discounts={mergedDiscounts}
+              deliveries={deliveries}
             />
           ) : (
             <>
@@ -1113,6 +1172,16 @@ export default function App() {
                   deliveries={deliveries}
                   branches={activeBranches}
                   products={activeProducts}
+                />
+              )}
+
+              {activeTab === 'discounts' && (isSuperAdmin || isBranchAdmin) && (
+                <DiscountsTab 
+                  currentUserProfile={userProfile}
+                  branches={activeBranches}
+                  products={activeProducts}
+                  users={allUsers}
+                  discounts={mergedDiscounts}
                 />
               )}
 

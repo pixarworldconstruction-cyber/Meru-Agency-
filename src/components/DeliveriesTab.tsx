@@ -4,7 +4,8 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import { DeliveryOrder, Branch, UserProfile, Product, DeliveryStatus } from '../types';
 import { 
   Truck, CheckCircle, Clock, AlertCircle, ShoppingBag, 
-  MapPin, Phone, User, Calendar, RefreshCcw, XCircle, FileText, Printer
+  MapPin, Phone, User, Calendar, RefreshCcw, XCircle, FileText, Printer,
+  DollarSign, CreditCard, Coins, CheckSquare, Edit, Pocket
 } from 'lucide-react';
 
 interface DeliveriesTabProps {
@@ -32,6 +33,12 @@ export default function DeliveriesTab({ currentUserProfile, deliveries, branches
   const [selectedBranchFilter, setSelectedBranchFilter] = useState('All');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('All');
   const [printingOrder, setPrintingOrder] = useState<DeliveryOrder | null>(null);
+
+  // Financial Editing States for Branch/Super Admins
+  const [editingPaymentOrderId, setEditingPaymentOrderId] = useState<string | null>(null);
+  const [inputPaymentStatus, setInputPaymentStatus] = useState<'pending' | 'partially_paid' | 'paid'>('pending');
+  const [inputAdvancePaid, setInputAdvancePaid] = useState<string>('');
+  const [inputLumpSumPaid, setInputLumpSumPaid] = useState<string>('');
 
   const activeBranch = branches.find(b => b.id === userBranchId);
 
@@ -66,6 +73,44 @@ export default function DeliveriesTab({ currentUserProfile, deliveries, branches
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, path);
     }
+  };
+
+  const handleUpdatePayment = async (order: DeliveryOrder) => {
+    const advanceVal = parseFloat(inputAdvancePaid) || 0;
+    const lumpSumVal = parseFloat(inputLumpSumPaid) || 0;
+    const grossVal = order.finalTotal || 0;
+    const outstanding = Math.max(0, grossVal - (advanceVal + lumpSumVal));
+
+    // Resolve payment status
+    let resolvedStatus = inputPaymentStatus;
+    if (advanceVal + lumpSumVal >= grossVal) {
+      resolvedStatus = 'paid';
+    } else if (advanceVal + lumpSumVal > 0) {
+      resolvedStatus = 'partially_paid';
+    }
+
+    try {
+      const orderRef = doc(db, 'deliveries', order.id);
+      await updateDoc(orderRef, {
+        paymentStatus: resolvedStatus,
+        advancePayment: advanceVal,
+        lumpSumPayment: lumpSumVal,
+        outstandingBalance: outstanding,
+        updatedAt: Date.now()
+      });
+      setEditingPaymentOrderId(null);
+      alert('Financial and ledger settlement updated successfully!');
+    } catch (err) {
+      console.error("Failed to update payment status: ", err);
+      alert('Could not update payment status on Firestore due to write permissions.');
+    }
+  };
+
+  const startEditPayment = (order: DeliveryOrder) => {
+    setEditingPaymentOrderId(order.id);
+    setInputPaymentStatus(order.paymentStatus || 'pending');
+    setInputAdvancePaid(order.advancePayment?.toString() || '0');
+    setInputLumpSumPaid(order.lumpSumPayment?.toString() || '0');
   };
 
   return (
@@ -221,7 +266,7 @@ export default function DeliveriesTab({ currentUserProfile, deliveries, branches
               </div>
 
               {/* Order Specifics */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+              <div className="grid grid-cols-1 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
                 {/* Hospital Address Section */}
                 <div className="p-5 space-y-3.5 text-xs">
                   <h5 className="font-bold text-slate-500 uppercase tracking-wider text-[10px] font-mono">Destination Address</h5>
@@ -234,6 +279,12 @@ export default function DeliveriesTab({ currentUserProfile, deliveries, branches
                       <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       <span>{order.contactPhone}</span>
                     </div>
+                    {order.orderedByStaff && (
+                      <div className="flex items-center gap-2 font-mono text-[10.5px]">
+                        <User className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                        <span className="truncate">Roster Staff: <strong className="text-slate-800">{order.orderedByStaff}</strong></span>
+                      </div>
+                    )}
                     {order.notes && (
                       <div className="mt-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex gap-2">
                         <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0 mt-0.5" />
@@ -249,26 +300,38 @@ export default function DeliveriesTab({ currentUserProfile, deliveries, branches
                   <div className="bg-slate-50 p-3 rounded-xl space-y-1.5 border border-slate-100">
                     <p className="font-bold text-slate-800">{matchedBranch?.name}</p>
                     <p className="text-slate-500 text-[11px]">{matchedBranch?.city} Logistics Center</p>
-                    <p className="text-slate-400 text-[10px]">Office Contact: {matchedBranch?.contactPhone}</p>
+                    <p className="text-slate-405 text-[10px]">Office Contact: {matchedBranch?.contactPhone}</p>
                   </div>
                 </div>
 
                 {/* Items requested and total pricing */}
-                <div className="p-5 space-y-3.5 text-xs flex flex-col justify-between">
+                <div className="p-5 space-y-3.5 text-xs">
                   <div>
                     <h5 className="font-bold text-slate-500 uppercase tracking-wider text-[10px] font-mono mb-2">Requested Devices</h5>
                     <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                      {order.items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-slate-700 bg-slate-50/40 p-1.5 rounded-md">
-                          <div>
-                            <span className="font-medium">{item.productName}</span>
-                            <span className="text-[10px] text-slate-400 font-mono block">SKU: {item.sku}</span>
+                      {order.items.map((item, idx) => {
+                        const hasProjDisc = item.isProductSpecific || (item.appliedDiscountRate && item.appliedDiscountRate > 0);
+                        return (
+                          <div key={idx} className="flex justify-between items-start gap-2 text-slate-705 bg-slate-50/40 p-1.5 rounded-md text-xs">
+                            <div className="min-w-0 flex-1">
+                              <span className="font-medium block truncate text-slate-800">{item.productName}</span>
+                              <span className="text-[10px] text-slate-400 font-mono block">SKU: {item.sku}</span>
+                              {hasProjDisc && (
+                                <span className={`text-[9.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded mt-1 inline-flex items-center gap-1 border ${
+                                  item.isProductSpecific 
+                                    ? 'bg-emerald-55/10 border-emerald-200 text-[#166534]' 
+                                    : 'bg-indigo-55/10 border-indigo-200 text-indigo-850'
+                                }`}>
+                                  {item.isProductSpecific ? `🎁 Product Offer: ${item.appliedDiscountRate}% Off` : `🏥 Facility Disc: ${item.appliedDiscountRate}% Off`}
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-mono font-bold bg-slate-200 text-slate-750 px-2 py-0.5 rounded text-[11px] shrink-0">
+                              {item.quantity}x
+                            </span>
                           </div>
-                          <span className="font-mono font-bold bg-slate-200 text-slate-750 px-2 py-0.5 rounded text-[11px]">
-                            {item.quantity}x
-                          </span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -292,10 +355,117 @@ export default function DeliveriesTab({ currentUserProfile, deliveries, branches
                     ) : (
                       <div className="flex justify-between items-baseline ">
                         <span className="font-semibold text-slate-500">Value of consignment:</span>
-                        <span className="font-mono text-base font-bold text-slate-900">
+                        <span className="font-mono text-base font-bold text-[#4F46E5]">
                           ₹{order.items.reduce((acc, item) => acc + (item.price * item.quantity), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* BRAND RECONCILIATION - STORES LUMP SUM AND ADvANCE PAYMENTS AS REQUESTED */}
+                <div className="p-5 space-y-3 text-xs flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <h5 className="font-bold text-slate-500 uppercase tracking-wider text-[10px] font-mono">Financial Ledger Receipt</h5>
+                    
+                    {/* Financial Status view */}
+                    <div className="bg-slate-55 bg-slate-50 p-3 rounded-xl border space-y-2">
+                      <div className="flex justify-between items-center text-xs font-semibold">
+                        <span className="text-slate-500 uppercase font-mono text-[9px] tracking-wide">Ledger Status:</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border text-center font-mono ${
+                          order.paymentStatus === 'paid' 
+                            ? 'text-emerald-800 bg-emerald-50 border-emerald-250' 
+                            : order.paymentStatus === 'partially_paid' 
+                              ? 'text-indigo-800 bg-indigo-50 border-indigo-200' 
+                              : 'text-rose-800 bg-rose-50 border-rose-200'
+                        }`}>
+                          {order.paymentStatus || 'pending'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 font-mono text-[10.5px] text-slate-600">
+                        <div className="flex justify-between">
+                          <span>Advance Recd:</span>
+                          <span className="font-bold text-slate-800">₹{(order.advancePayment || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Lump-Sum:</span>
+                          <span className="font-bold text-slate-800">₹{(order.lumpSumPayment || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between border-t border-slate-205/60 pt-1 text-xs">
+                          <span className="font-bold text-slate-700">Outstanding:</span>
+                          <span className="font-extrabold text-indigo-700">₹{(order.outstandingBalance !== undefined ? order.outstandingBalance : Math.max(0, (order.finalTotal || 0) - ((order.advancePayment || 0) + (order.lumpSumPayment || 0)))).toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment controls panel */}
+                  <div className="pt-2">
+                    {editingPaymentOrderId === order.id ? (
+                      <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-205 space-y-3">
+                        <p className="font-black font-mono text-[9px] uppercase text-amber-805 tracking-wider">Configure Settlement Ledger</p>
+                        
+                        <div className="space-y-2">
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Manual Payment Status</label>
+                            <select
+                              value={inputPaymentStatus}
+                              onChange={(e) => setInputPaymentStatus(e.target.value as any)}
+                              className="w-full bg-white border border-slate-200 rounded px-1.5 py-1 text-[11px]"
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="partially_paid">Partially Paid</option>
+                              <option value="paid">Paid</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Received Advance (₹)</label>
+                            <input
+                              type="number"
+                              value={inputAdvancePaid}
+                              onChange={(e) => setInputAdvancePaid(e.target.value)}
+                              placeholder="₹ e.g. 5000"
+                              className="w-full bg-white border border-slate-200 rounded px-1.5 py-1 text-[11px] font-mono"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-0.5">Lump-Sum Payment (₹)</label>
+                            <input
+                              type="number"
+                              value={inputLumpSumPaid}
+                              onChange={(e) => setInputLumpSumPaid(e.target.value)}
+                              placeholder="₹ e.g. 15000"
+                              className="w-full bg-white border border-slate-200 rounded px-1.5 py-1 text-[11px] font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex gap-1.5 pt-1">
+                          <button
+                            onClick={() => handleUpdatePayment(order)}
+                            className="flex-1 bg-emerald-650 hover:bg-emerald-700 bg-emerald-600 text-white font-extrabold text-[10px] py-1 rounded cursor-pointer"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingPaymentOrderId(null)}
+                            className="flex-1 bg-slate-200 hover:bg-slate-350 bg-slate-300 text-slate-700 font-bold text-[10px] py-1 rounded cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => startEditPayment(order)}
+                        className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-205 rounded-xl text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <DollarSign className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>Reconcile Payments</span>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -372,6 +542,9 @@ export default function DeliveriesTab({ currentUserProfile, deliveries, branches
                     <p className="font-bold text-slate-905 uppercase text-[10px] tracking-wider font-mono">Bill To (Hospital Client):</p>
                     <p className="font-bold text-slate-805 text-sm">{printingOrder.hospitalName}</p>
                     <p className="text-slate-600">{printingOrder.address}</p>
+                    {printingOrder.orderedByStaff && (
+                      <p className="text-slate-500 font-mono text-[10.5px]">Authorizing Staff: {printingOrder.orderedByStaff}</p>
+                    )}
                     <p className="font-mono">Phone: {printingOrder.contactPhone}</p>
                   </div>
                   <div className="space-y-1.5 bg-slate-50 p-4 rounded-xl border border-slate-100">
@@ -395,39 +568,71 @@ export default function DeliveriesTab({ currentUserProfile, deliveries, branches
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-                      {printingOrder.items.map((it, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/20">
-                          <td className="py-3 px-3 font-medium text-slate-900">{it.productName}</td>
-                          <td className="py-3 px-3 tracking-wider text-center font-mono text-[11px] text-slate-500">{it.sku}</td>
-                          <td className="py-3 px-3 font-mono text-right">₹{it.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                          <td className="py-3 px-3 font-mono font-bold text-center">{it.quantity}</td>
-                          <td className="py-3 px-3 font-mono font-bold text-right text-slate-905">₹{(it.price * it.quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                      ))}
+                      {printingOrder.items.map((it, idx) => {
+                        const hasItDisc = it.appliedDiscountRate && it.appliedDiscountRate > 0;
+                        const finalItPrice = hasItDisc ? (it.price * (1 - it.appliedDiscountRate / 100)) : it.price;
+
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50/20">
+                            <td className="py-3 px-3 font-medium text-slate-900">
+                              <div>{it.productName}</div>
+                              {hasItDisc && (
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded inline-block mt-1 font-mono tracking-wide border ${
+                                  it.isProductSpecific 
+                                    ? 'bg-emerald-55/10 border-emerald-200 text-[#166534]' 
+                                    : 'bg-indigo-55/10 border-indigo-200 text-indigo-850'
+                                }`}>
+                                  {it.isProductSpecific ? '🎁 Product-Specific Offer' : '🏥 Hospital Partner Rate'} ({it.appliedDiscountRate}% Off)
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 tracking-wider text-center font-mono text-[11px] text-slate-500">{it.sku}</td>
+                            <td className="py-3 px-3 font-mono text-right">
+                              {hasItDisc ? (
+                                <>
+                                  <div className="line-through text-slate-400 text-[10px]">₹{it.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                  <div className="text-[#166534] font-bold">₹{finalItPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                </>
+                              ) : (
+                                <span>₹{it.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 font-mono font-bold text-center">{it.quantity}</td>
+                            <td className="py-3 px-3 font-mono font-bold text-right text-slate-905">
+                              ₹{(finalItPrice * it.quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
 
                 {/* Bottom line Receipts break-downs */}
                 <div className="border-t border-slate-200 pt-4 flex justify-between items-start">
-                  <div className="max-w-xs text-[11px] text-slate-500 space-y-1 mt-1">
-                    <p className="font-bold text-slate-700">Payment Terms</p>
-                    <p>Standard consolidation dispatch billing. This receipt lists active hospital consignment counts processed on behalf of MedLogix Systems.</p>
+                  <div className="max-w-xs text-[11px] text-slate-500 space-y-1.5 mt-1">
+                    <p className="font-bold text-slate-700">Payment Reconciliation Details</p>
+                    <div className="space-y-1 font-mono text-[10px] bg-slate-50 p-2.5 rounded-lg border">
+                      <p>Payment Status: <span className="font-bold uppercase text-indigo-700">{printingOrder.paymentStatus || 'pending'}</span></p>
+                      <p>Advance Received: ₹{(printingOrder.advancePayment || 0).toLocaleString('en-IN')}</p>
+                      <p>Lump-Sum Paid: ₹{(printingOrder.lumpSumPayment || 0).toLocaleString('en-IN')}</p>
+                      <p className="font-bold text-slate-800 border-t pt-1 mt-1">Ledger Balance: ₹{(printingOrder.outstandingBalance !== undefined ? printingOrder.outstandingBalance : Math.max(0, finalVal - ((printingOrder.advancePayment || 0) + (printingOrder.lumpSumPayment || 0)))).toLocaleString('en-IN')}</p>
+                    </div>
                   </div>
                   <div className="w-68 space-y-2 text-xs">
                     <div className="flex justify-between items-baseline text-slate-500">
-                      <span>Cart Ledger Subtotal:</span>
+                      <span>Gross Ledger Subtotal:</span>
                       <span className="font-mono">₹{sub.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
-                    {discRate > 0 && (
-                      <div className="flex justify-between items-baseline text-[#166534] font-semibold bg-[#DCFCE7]/40 px-2 py-0.5 rounded">
-                        <span>Partner Discount ({discRate}%):</span>
-                        <span className="font-mono">-₹{discAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    {discAmt > 0 && (
+                      <div className="flex justify-between items-baseline text-[#166534] font-semibold bg-[#DCFCE7]/40 px-2 py-0.5 rounded border border-[#BBF7D0]">
+                        <span>Applied Ledger Discounts:</span>
+                        <span className="font-mono font-black">-₹{discAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                       </div>
                     )}
                     <div className="flex justify-between items-baseline border-t border-slate-205 pt-2 text-slate-905 animate-fadeIn">
                       <span className="font-bold text-sm text-slate-800 font-sans">Final Settled Total:</span>
-                      <span className="font-mono text-base font-black text-indigo-700">₹{finalVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-base font-black text-indigo-700 font-mono">₹{finalVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
                   </div>
                 </div>

@@ -66,6 +66,21 @@
         "updatedAt": { "type": "number" }
       },
       "required": ["hospitalUid", "hospitalName", "city", "address", "contactPhone", "items", "branchId", "status", "createdAt", "updatedAt"]
+    },
+    "BranchDiscount": {
+      "title": "BranchDiscount",
+      "description": "Product-specific discount rate configured by a branch for a particular hospital client",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "branchId": { "type": "string" },
+        "hospitalUid": { "type": "string" },
+        "productId": { "type": "string" },
+        "discountPercent": { "type": "number" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["branchId", "hospitalUid", "productId", "discountPercent", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -84,6 +99,10 @@
     "/deliveries/{deliveryId}": {
       "schema": "DeliveryOrder",
       "description": "Consignment requests that regional branch coordinators dispatch dynamically"
+    },
+    "/discounts/{discountId}": {
+      "schema": "BranchDiscount",
+      "description": "Product-specific discounts given to hospital clients in regional hubs"
     }
   }
 }
