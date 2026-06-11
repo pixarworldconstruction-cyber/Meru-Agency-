@@ -75,9 +75,10 @@ export default function TransfersTab({ currentUserProfile, branches, products, t
     const demBranch = branches.find(b => b.id === demandingBranchId)!;
     const supBranch = branches.find(b => b.id === supplyingBranchId)!;
 
-    const path = 'transfers';
+    const path = 'deliveries';
     try {
       await addDoc(collection(db, path), {
+        isTransfer: true,
         demandingBranchId,
         demandingBranchName: demBranch.name,
         supplyingBranchId,
@@ -132,7 +133,7 @@ export default function TransfersTab({ currentUserProfile, branches, products, t
     const batch = writeBatch(db);
     
     // 1. Update the transfer order document status
-    const transferRef = doc(db, 'transfers', transfer.id);
+    const transferRef = doc(db, 'deliveries', transfer.id);
     batch.update(transferRef, {
       status: 'completed' as TransferStatus,
       updatedAt: Date.now(),
@@ -151,7 +152,7 @@ export default function TransfersTab({ currentUserProfile, branches, products, t
       await batch.commit();
       alert('Transfer successful! Stock balances updated and synchronized in real-time.');
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `transfers/${transfer.id}`);
+      handleFirestoreError(err, OperationType.UPDATE, `deliveries/${transfer.id}`);
       alert('Error finalizing transfer: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
@@ -160,9 +161,9 @@ export default function TransfersTab({ currentUserProfile, branches, products, t
   const handleCancelTransfer = async (transfer: TransferDemand) => {
     if (!window.confirm('Are you sure you want to cancel this transfer demand request?')) return;
 
-    const path = `transfers/${transfer.id}`;
+    const path = `deliveries/${transfer.id}`;
     try {
-      const transferRef = doc(db, 'transfers', transfer.id);
+      const transferRef = doc(db, 'deliveries', transfer.id);
       await updateDoc(transferRef, {
         status: 'cancelled' as TransferStatus,
         updatedAt: Date.now(),

@@ -298,8 +298,13 @@ export default function App() {
     });
 
     const unsubDeliveries = onSnapshot(collection(db, 'deliveries'), (snapshot) => {
-      const deliveryList = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as DeliveryOrder));
+      const allDocs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      const deliveryList = allDocs.filter(d => !(d as any).isTransfer) as DeliveryOrder[];
+      const transferList = allDocs.filter(d => (d as any).isTransfer) as any[] as TransferDemand[];
+      
       setDeliveries(deliveryList);
+      setTransfers(transferList);
     }, (err) => {
       console.warn("Permission restricted for deliveries: ", err);
     });
@@ -309,13 +314,6 @@ export default function App() {
       setDiscounts(discountList);
     }, (err) => {
       console.warn("Permission restricted for discounts: ", err);
-    });
-
-    const unsubTransfers = onSnapshot(collection(db, 'transfers'), (snapshot) => {
-      const transferList = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as TransferDemand));
-      setTransfers(transferList);
-    }, (err) => {
-      console.warn("Permission restricted for transfers: ", err);
     });
 
     // Sync all users directory - only accessible to authorized admins, we'll gracefully ignore on permission error
@@ -332,7 +330,6 @@ export default function App() {
       unsubDeliveries();
       unsubUsers();
       unsubDiscounts();
-      unsubTransfers();
     };
   }, [currentUser]);
 

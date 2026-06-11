@@ -1000,26 +1000,6 @@ export default function HospitalClientView({
                   {cart.length > 0 && (
                     <form onSubmit={handlePlaceOrder} className="space-y-4 pt-3 border-t">
                       
-                      {/* Authorized Staff Coordinator Selection! IMPLEMENTS MULTIPLE PEOPLE DISPATCH CHECKBOX LIST/SELECT! */}
-                      <div>
-                        <label className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                          👤 Authorizing Order Clinician / Staff member
-                        </label>
-                        <select
-                          value={selectedOrderingStaffId}
-                          onChange={(e) => setSelectedOrderingStaffId(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-hidden text-xs text-slate-700 font-semibold"
-                        >
-                          <option value="">{currentUserProfile?.displayName} (Active Profile Coordinator)</option>
-                          {currentUserProfile?.staffList?.map(staff => (
-                            <option key={staff.id} value={staff.id}>
-                              {staff.name} - {staff.designation} ({staff.phone})
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-[9.5px] text-slate-400 mt-1">Select one of your registered on-duty medical professionals to sign this consignment receipt.</p>
-                      </div>
-
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 mb-1">Destination Clinic/Hospital</label>
                         <input
@@ -1181,121 +1161,7 @@ export default function HospitalClientView({
             </form>
           </div>
 
-          {/* ADD UP TO 3 CLINICAL/STAFF USERS PANEL! */}
-          <div className="bg-white border border-slate-105 p-6 rounded-2xl shadow-xs space-y-5">
-            <div className="border-b pb-3 flex justify-between items-center">
-              <div>
-                <h3 className="text-base font-bold text-slate-800 flex items-center gap-1.5">
-                  <Users className="w-5 h-5 text-indigo-500" /> Clinical Team (Max 3 staff)
-                </h3>
-                <p className="text-[11px] text-slate-450 mt-0.5">Roster of medical representatives authorized to order</p>
-              </div>
-              <span className="text-[10px] font-black tracking-widest font-mono text-slate-400 bg-slate-100 px-2.5 py-1 rounded">
-                {(currentUserProfile?.staffList || []).length} / 3 staff
-              </span>
-            </div>
 
-            {staffSuccess && (
-              <div className="p-3 bg-emerald-50 border border-emerald-150 text-emerald-850 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 font-sans">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span>{staffSuccess}</span>
-              </div>
-            )}
-
-            {staffError && (
-              <div className="p-3 bg-rose-50 border border-rose-150 text-rose-855 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 font-sans">
-                <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                <span>{staffError}</span>
-              </div>
-            )}
-
-            {/* List of current authorized personnel staff members */}
-            <div className="space-y-3.5 max-h-56 overflow-y-auto pr-1">
-              {(currentUserProfile?.staffList || []).map(staff => (
-                <div 
-                  key={staff.id} 
-                  className="bg-slate-50 p-3 rounded-xl border border-slate-101 flex justify-between items-start gap-2.5 leading-tight text-xs"
-                >
-                  <div className="space-y-1">
-                    <p className="font-bold text-slate-800 flex items-center gap-1">
-                      <UserCheck className="w-3.5 h-3.5 text-indigo-500" /> {staff.name}
-                    </p>
-                    <p className="text-[10.5px] font-mono text-indigo-700 font-bold uppercase tracking-tight">{staff.designation}</p>
-                    <p className="text-[10px] text-slate-400">Phone: {staff.phone}</p>
-                  </div>
-                  <button
-                    onClick={() => handleRemoveStaffMember(staff.id)}
-                    className="text-[10px] font-bold text-rose-650 hover:text-rose-800 bg-rose-100/30 hover:bg-rose-100/80 px-2 py-1 rounded transition-colors cursor-pointer shrink-0"
-                    title="Remove user permissions"
-                  >
-                    Revoke
-                  </button>
-                </div>
-              ))}
-
-              {(currentUserProfile?.staffList || []).length === 0 && (
-                <div className="text-center py-6 text-slate-400 text-xs italic bg-slate-50/50 border border-dashed rounded-xl">
-                  No staff registered besides active coordinator profile. Register clinicians up to 3 people below!
-                </div>
-              )}
-            </div>
-
-            {/* Form to append staff member */}
-            {(currentUserProfile?.staffList || []).length < 3 ? (
-              <form onSubmit={handleAddStaffMember} className="space-y-3 pt-4 border-t border-slate-100">
-                <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest font-mono">➕ Authorize Clinician</h4>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-450 mb-1">Full Representative Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={newStaffName}
-                    onChange={(e) => setNewStaffName(e.target.value)}
-                    placeholder="e.g. Dr. Sarah Paul"
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-lg text-xs"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-450 mb-1">Roster Phone</label>
-                    <input
-                      type="text"
-                      required
-                      value={newStaffPhone}
-                      onChange={(e) => setNewStaffPhone(e.target.value)}
-                      placeholder="+1 (312) 555-0105"
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-lg text-xs tracking-wide font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-450 mb-1">Designation</label>
-                    <input
-                      type="text"
-                      required
-                      value={newStaffDesignation}
-                      onChange={(e) => setNewStaffDesignation(e.target.value)}
-                      placeholder="e.g. Lead Surgeon"
-                      className="w-full px-3 py-1.5 bg-slate-50 border border-slate-150 rounded-lg text-xs"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-2 bg-indigo-650 hover:bg-indigo-750 text-white font-bold text-xs uppercase tracking-wider rounded-lg cursor-pointer transition-colors text-center"
-                >
-                  Register On-Duty Clinician
-                </button>
-              </form>
-            ) : (
-              <div className="bg-amber-100/30 p-3 rounded-xl border text-[10px] text-slate-500 font-sans flex items-start gap-1.5">
-                <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <span>Roster full (Capacity of 3 users reached). Granting additional clinicians requires revoking permissions from one of the active representatives above.</span>
-              </div>
-            )}
-          </div>
 
         </div>
       )}
