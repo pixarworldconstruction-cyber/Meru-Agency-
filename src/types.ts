@@ -31,6 +31,11 @@ export interface Branch {
   contactPhone: string;
   discounts?: BranchDiscount[]; // Nested fallback discounts to bypass Firestore rules limitations
   createdAt: number;
+  managerName?: string;        // Branch manager / point of contact
+  email?: string;              // Official branch email
+  operatingHours?: string;     // Operating hours (e.g. 08:00 AM - 08:00 PM)
+  status?: 'active' | 'maintenance' | 'closed'; // Current Hub operational status
+  capacityValue?: number;      // Medical supply storage capacity (units)
 }
 
 export interface Product {
@@ -56,6 +61,7 @@ export interface DeliveryItem {
   appliedDiscountRate?: number;
   appliedDiscountAmount?: number;
   isProductSpecific?: boolean;
+  returnedQty?: number; // Added for return and restock workflow
 }
 
 export interface BranchDiscount {
@@ -94,6 +100,8 @@ export interface DeliveryOrder {
   lumpSumPayment?: number;       // Total lump sum payments received
   outstandingBalance?: number;   // Calculated left to pay
   orderedByStaff?: string;       // Name of user/person placing the order (max 3 person concept)
+  isReturnsFinalized?: boolean;  // True if hospital return and restocking has been processed
+  returnsProcessedAt?: number;   // Timestamp of return processing
 }
 
 export interface ActivityLog {

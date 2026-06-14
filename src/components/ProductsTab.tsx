@@ -477,7 +477,7 @@ export default function ProductsTab({ currentUserProfile, products, branches, on
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Standard Price (INR)</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Product Maximum Retail Price (MRP) (₹)</label>
                 <div className="relative">
                   <span className="absolute left-3 top-2 text-slate-400 text-sm">₹</span>
                   <input
@@ -638,7 +638,7 @@ export default function ProductsTab({ currentUserProfile, products, branches, on
             <tr className="border-b border-slate-100 text-[11px] font-bold tracking-wider text-slate-400 bg-slate-50/30 uppercase">
               <th className="px-6 py-4 w-1/3">Item Details</th>
               <th className="px-6 py-4 w-1/6">SKU / Code</th>
-              <th className="px-6 py-4 w-1/6">Price / Unit</th>
+              <th className="px-6 py-4 w-1/6">MRP / Unit</th>
               <th className="px-6 py-4 w-1/4">Stock Per Branch</th>
               <th className="px-6 py-4 text-right w-24">Actions</th>
             </tr>

@@ -7,44 +7,45 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Default catch-all denies all operations
+    // Default catch-all denies all operations unless explicitly overridden below
     match /{document=**} {
       allow read, write: if false;
     }
 
     // 1. Users Profile Collection
     match /users/{userId} {
-      // Allow read and write for any signed-in users so profiles are fully synchronized
-      allow read, write: if isSignedIn();
+      // Allow complete read, create, update, and delete operations for authenticated users
+      allow read, create, update, delete: if isSignedIn();
     }
 
     // 2. Regional Branches Collection
     match /branches/{branchId} {
-      // Allow read and write for signed-in users to manage fulfillment hubs
-      allow read, write: if isSignedIn();
+      // Allow standard branch hub access and deletions
+      allow read, create, update, delete: if isSignedIn();
     }
 
     // 3. Products Catalogue Collection
     match /products/{productId} {
-      // Allow read and write for signed-in users so stock and pricing are managed smoothly
-      allow read, write: if isSignedIn();
+      // Allow sterile product entries and catalog inventory deletions
+      allow read, create, update, delete: if isSignedIn();
     }
 
     // 4. Consignments & Deliveries Collection
     match /deliveries/{deliveryId} {
-      // Allow read and write for signed-in users to place, prepare, ship, or cancel orders
-      allow read, write: if isSignedIn();
+      // Allow complete delivery status updates, transfer orders, and tracking record deletions
+      allow read, create, update, delete: if isSignedIn();
     }
 
     // 5. Product-specific Discounts Collection
     match /discounts/{discountId} {
-      // Allow read and write for signed-in users so discounts are securely fetched and set
-      allow read, write: if isSignedIn();
+      // Allow regional hub discounts to be added, adjusted, or deleted
+      allow read, create, update, delete: if isSignedIn();
     }
 
     // 6. Branch internal stock transfer demands
     match /transfers/{transferId} {
-      allow read, write: if isSignedIn();
+      // Allow internal stock transfers and demand cancellations/deletions
+      allow read, create, update, delete: if isSignedIn();
     }
   }
 }

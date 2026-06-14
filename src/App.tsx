@@ -1198,6 +1198,7 @@ export default function App() {
                   branches={activeBranches}
                   setBranches={setBranches}
                   onMarkDeleted={(id) => setDeletedBranchIds(prev => [...prev, id])}
+                  products={activeProducts}
                 />
               )}
 
